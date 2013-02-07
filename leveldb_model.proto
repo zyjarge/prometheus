@@ -1,0 +1,35 @@
+package main;
+
+
+// Control:
+message KeySingular {
+  optional string fingerprint = 1; // Hash of Metric
+  optional bytes timestamp = 2; // Big Endian-Encoded timestamp of sample.
+};
+
+message ValueSingular {
+  optional float value = 1;  // Recorded value.
+};
+
+// Test
+//
+// - Two Approaches:
+//   - Static Chunk Size
+//   - Random Chunk Size
+//     // Min
+//     // Max
+//
+message KeyPlural {
+  optional string fingerprint = 1;
+  optional bytes open_timestamp = 2;
+  optional int64 last_timestamp = 3;
+};
+
+message ValuePlural {
+  message Value {
+    optional int64 timestamp = 1;
+    optional float value = 2;
+  };
+
+  repeated Value value = 1;
+};
