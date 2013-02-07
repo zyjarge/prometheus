@@ -10,6 +10,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -117,7 +118,7 @@ func preparePluralLevelDb() *levigo.DB {
 			key := &KeyPlural{
 				Fingerprint:   proto.String(prefix),
 				OpenTimestamp: timestampBytes,
-				LastTimestamp: proto.Int64(int64(end)),
+				LastTimestamp: proto.Int64(int64(end) - 1),
 			}
 			value := &ValuePlural{}
 
@@ -234,43 +235,40 @@ func testLevelDbSeekAtIntervalPlural(db *levigo.DB) {
 
 		workerSemaphore <- true
 		go func(index int) {
+			var retrievedKey *KeyPlural = nil
+			var retrievedValue *ValuePlural = nil
+
 			for j := 0; j < *lookupCount; j++ {
 				h := j * *lookupInterval
-				timestampBytes := make([]byte, 8)
-				binary.BigEndian.PutUint64(timestampBytes, uint64(h))
-				key := &KeyPlural{
-					Fingerprint:   proto.String(keyspaceRoots[index]),
-					OpenTimestamp: timestampBytes,
-				}
-				keyBytes, err := proto.Marshal(key)
-				if err != nil {
-					panic(err)
-				}
-				iterator.Seek(keyBytes)
 
-				if !iterator.Valid() {
-					panic(fmt.Sprintf("key (%s) -> invalid", keyBytes))
-				}
-
-				retrievedKey := &KeyPlural{}
-				err = proto.Unmarshal(iterator.Key(), retrievedKey)
-				if err != nil {
-					panic(err)
-				}
-
-				if *expensiveCheck {
-					if *key.Fingerprint != *retrievedKey.Fingerprint {
-						panic(fmt.Sprintf("Fingerprint %s != Fingerprint %s", *key.Fingerprint, *retrievedKey.Fingerprint))
+				if retrievedKey != nil {
+					if *retrievedKey.Fingerprint != keyspaceRoots[index] {
+						retrievedKey = nil
+						retrievedValue = nil
+					} else if int(*retrievedKey.LastTimestamp) < h {
+						retrievedKey = nil
+						retrievedValue = nil
 					}
 				}
 
-				foundOpenTimestamp := int(binary.BigEndian.Uint64(retrievedKey.OpenTimestamp))
-				if foundOpenTimestamp > h {
-					iterator.Prev()
+				if retrievedValue == nil {
+					timestampBytes := make([]byte, 8)
+					binary.BigEndian.PutUint64(timestampBytes, uint64(h))
+					key := &KeyPlural{
+						Fingerprint:   proto.String(keyspaceRoots[index]),
+						OpenTimestamp: timestampBytes,
+					}
+					keyBytes, err := proto.Marshal(key)
+					if err != nil {
+						panic(err)
+					}
+					iterator.Seek(keyBytes)
+
 					if !iterator.Valid() {
-						panic("Backtrack failed!")
+						panic(fmt.Sprintf("key (%s) -> invalid", keyBytes))
 					}
 
+					retrievedKey = &KeyPlural{}
 					err = proto.Unmarshal(iterator.Key(), retrievedKey)
 					if err != nil {
 						panic(err)
@@ -282,27 +280,57 @@ func testLevelDbSeekAtIntervalPlural(db *levigo.DB) {
 						}
 					}
 
-					foundOpenTimestamp = int(binary.BigEndian.Uint64(retrievedKey.OpenTimestamp))
+					foundOpenTimestamp := int(binary.BigEndian.Uint64(retrievedKey.OpenTimestamp))
 					if foundOpenTimestamp > h {
-						panic(fmt.Sprintf("Did not contain timestamp %s for %s at %d", retrievedKey, key, h))
-					}
-				}
+						iterator.Prev()
+						if !iterator.Valid() {
+							panic("Backtrack failed!")
+						}
 
-				retrievedValue := &ValuePlural{}
-				err = proto.Unmarshal(iterator.Value(), retrievedValue)
-				if err != nil {
-					panic(err)
+						err = proto.Unmarshal(iterator.Key(), retrievedKey)
+						if err != nil {
+							panic(err)
+						}
+
+						if *expensiveCheck {
+							if *key.Fingerprint != *retrievedKey.Fingerprint {
+								panic(fmt.Sprintf("Fingerprint %s != Fingerprint %s", *key.Fingerprint, *retrievedKey.Fingerprint))
+							}
+						}
+
+						foundOpenTimestamp = int(binary.BigEndian.Uint64(retrievedKey.OpenTimestamp))
+						if foundOpenTimestamp > h {
+							panic(fmt.Sprintf("Did not contain timestamp %s for %s at %d", retrievedKey, key, h))
+						}
+					}
+
+					retrievedValue = &ValuePlural{}
+					err = proto.Unmarshal(iterator.Value(), retrievedValue)
+					if err != nil {
+						panic(err)
+					}
 				}
 
 				foundValue := false
-				for _, value := range retrievedValue.Value {
-					if int(*value.Timestamp) == h {
-						foundValue = true
-						break
-					}
+				i := sort.Search(len(retrievedValue.Value), func(i int) bool {
+					return int(*retrievedValue.Value[i].Timestamp) >= h
+				})
+				if int(*retrievedValue.Value[i].Timestamp) == h {
+					foundValue = true
+					break
 				}
+				// Linear Search
+				// for _, value := range retrievedValue.Value {
+				// 	if int(*value.Timestamp) == h {
+				// 		foundValue = true
+				// 		break
+				// 	}
+				// }
 
 				if !foundValue {
+					fmt.Printf("h -> %d\n", h)
+					fmt.Printf("k -> %s\n", retrievedKey)
+					fmt.Printf("v -> %s\n", retrievedValue)
 					panic("Never found candidate!")
 				}
 			}
