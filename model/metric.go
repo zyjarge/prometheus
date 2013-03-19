@@ -124,7 +124,7 @@ func (v Values) InsideInterval(t time.Time) (s bool) {
 		return
 	}
 
-	if t.Before(v[0]).Timestamp {
+	if t.Before(v[0].Timestamp) {
 		return
 	}
 
