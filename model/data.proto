@@ -59,3 +59,13 @@ message MembershipIndexValue {
 message MetricHighWatermark {
   optional int64 timestamp = 1;
 }
+
+message CurationKey {
+  optional Fingerprint fingerprint = 1;
+  optional int64       older_than  = 2;
+  optional uint32      group_size  = 3;
+}
+
+message CurationValue {
+  optional int64 last_completion_timestamp = 1;
+}
