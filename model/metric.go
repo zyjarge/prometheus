@@ -15,9 +15,8 @@ package model
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -64,20 +63,6 @@ func (l LabelSet) String() string {
 	fmt.Fprintf(&buffer, "}")
 
 	return buffer.String()
-}
-
-type LabelNames []LabelName
-
-func (l LabelNames) Len() int {
-	return len(l)
-}
-
-func (l LabelNames) Less(i, j int) bool {
-	return l[i] < l[j]
-}
-
-func (l LabelNames) Swap(i, j int) {
-	l[i], l[j] = l[j], l[i]
 }
 
 // A Metric is similar to a LabelSet, but the key difference is that a Metric is
