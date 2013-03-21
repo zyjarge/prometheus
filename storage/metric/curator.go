@@ -54,16 +54,16 @@ func (w watermarkDecoder) DecodeKey(in interface{}) (out interface{}, err error)
 
 func (w watermarkDecoder) DecodeValue(in interface{}) (out interface{}, err error) {
 	var (
-		value = &dto.MetricHighWatermark{}
+		dto   = &dto.MetricHighWatermark{}
 		bytes = in.([]byte)
 	)
 
-	err = proto.Unmarshal(bytes, value)
+	err = proto.Unmarshal(bytes, dto)
 	if err != nil {
 		return
 	}
 
-	out = value
+	out = model.NewCurationRemarkFromDTO(dto)
 
 	return
 }
@@ -74,8 +74,8 @@ type watermarkDiscriminator struct {
 
 func (w watermarkDiscriminator) Filter(_, value interface{}) (result FilterResult) {
 	var (
-		decodedValue = value.(*dto.MetricHighWatermark)
-		foundTime    = time.Unix(*decodedValue.Timestamp, 0)
+		remark    = value.(model.CurationRemark)
+		foundTime = time.Unix(*decodedValue.Timestamp, 0)
 	)
 
 	if foundTime.Before(w.recencyCutOff) {
@@ -95,6 +95,7 @@ func (w watermarkOperator) Operate(key, value interface{}) (err *OperatorError) 
 	var (
 		fingerprint = key.(model.Fingerprint)
 	)
+
 }
 
 func (w watermarkOperator) hasBeenCurated(f model.Fingerprint) (curated bool, err error) {

@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-type CurationRemark struct {
+type Watermark struct {
 	LastCompletionTimestamp time.Time
 }
 
