@@ -18,8 +18,13 @@ all: test
 test: build
 	go test ./... $(GO_TEST_FLAGS)
 
-build:
+model:
 	$(MAKE) -C model
+
+native: model
+	$(MAKE) -C native
+
+build: model native
 	$(MAKE) -C web
 	go build ./...
 
@@ -28,6 +33,7 @@ binary: build
 
 clean:
 	$(MAKE) -C model clean
+	$(MAKE) -C native clean
 	$(MAKE) -C web clean
 	rm -rf $(TEST_ARTIFACTS)
 	-find . -type f -iname '*~' -exec rm '{}' ';'
@@ -46,4 +52,4 @@ search_index:
 documentation: search_index
 	godoc -http=:6060 -index -index_files='search_index'
 
-.PHONY: advice binary build clean documentation format search_index test
+.PHONY: advice binary build clean documentation format model native search_index test
