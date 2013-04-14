@@ -20,6 +20,9 @@
 
 MAKE_ARTIFACTS = libcomparer.a comparer.o ccomparer.o test_suite test_suite.o
 
+CXXFLAGS += -Wall
+CFLAGS += -Wall
+
 all: test
 
 test: test_suite

@@ -14,7 +14,14 @@
 #include "comparer.hpp"
 #include "comparer.h"
 
-const int compare(const char *l, size_t llen,
+int compare(void *unused, const char *l, size_t llen,
                   const char *r, size_t rlen) {
   return Compare(l, llen, r, rlen);
+}
+
+void destroy(void *unused) {
+}
+
+const char *name(void *unused) {
+  return COMPARATOR_NAME;
 }

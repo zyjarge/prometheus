@@ -26,7 +26,7 @@ TEST(CompareAnomaly, BothEmpty) {
   dto::SampleKey().SerializeToString(&right);
 
   EXPECT_EQ(0, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(0, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(0, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareAnomaly, LeftEmpty) {
@@ -46,7 +46,7 @@ TEST(CompareAnomaly, LeftEmpty) {
   r.SerializeToString(&right);
 
   EXPECT_EQ(-1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(-1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(-1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareAnomaly, RightEmpty) {
@@ -66,7 +66,7 @@ TEST(CompareAnomaly, RightEmpty) {
   l.SerializeToString(&left);
 
   EXPECT_EQ(1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(Compare, BothEqual) {
@@ -86,7 +86,7 @@ TEST(Compare, BothEqual) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(0, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(0, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(0, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareBothEqual, NoLastTimestampSideEffects) {
@@ -107,7 +107,7 @@ TEST(CompareBothEqual, NoLastTimestampSideEffects) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(0, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(0, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(0, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareBothEqual, NoSampleCountSideEffects) {
@@ -128,7 +128,7 @@ TEST(CompareBothEqual, NoSampleCountSideEffects) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(0, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(0, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(0, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 
@@ -150,7 +150,7 @@ TEST(CompareHash, SmallerLeft) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(-1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(-1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(-1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareHash, SmallerRight) {
@@ -171,7 +171,7 @@ TEST(CompareHash, SmallerRight) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareFirst, SmallerLeft) {
@@ -192,7 +192,7 @@ TEST(CompareFirst, SmallerLeft) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(-1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(-1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(-1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareFirst, SmallerRight) {
@@ -213,7 +213,7 @@ TEST(CompareFirst, SmallerRight) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareModulus, SmallerLeft) {
@@ -234,7 +234,7 @@ TEST(CompareModulus, SmallerLeft) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(-1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(-1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(-1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareModulus, SmallerRight) {
@@ -255,7 +255,7 @@ TEST(CompareModulus, SmallerRight) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareLast, SmallerLeft) {
@@ -276,7 +276,7 @@ TEST(CompareLast, SmallerLeft) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(-1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(-1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(-1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareLast, SmallerRight) {
@@ -297,7 +297,7 @@ TEST(CompareLast, SmallerRight) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareTimestamp, SmallerLeft) {
@@ -318,7 +318,7 @@ TEST(CompareTimestamp, SmallerLeft) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(-1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(-1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(-1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
 }
 
 TEST(CompareTimestamp, SmallerRight) {
@@ -339,5 +339,27 @@ TEST(CompareTimestamp, SmallerRight) {
   both.SerializeToString(&right);
 
   EXPECT_EQ(1, Compare(left.c_str(), left.size(), right.c_str(), right.size()));
-  EXPECT_EQ(1, compare(left.c_str(), left.size(), right.c_str(), right.size()));
+  EXPECT_EQ(1, compare(NULL, left.c_str(), left.size(), right.c_str(), right.size()));
+}
+
+TEST(Protocol, Compare) {
+  int (*f)(void*, const char*, size_t, const char*, size_t) = &compare;
+
+  EXPECT_FALSE(f == NULL);
+}
+
+TEST(Protocol, Name) {
+  const char* (*f)(void*) = &name;
+
+  EXPECT_FALSE(f == NULL);
+
+  EXPECT_STREQ("SampleKeyComparator", f(NULL));
+}
+
+TEST(Protocol, Destroy) {
+  void (*f)(void*) = &destroy;
+
+  EXPECT_FALSE(f == NULL);
+
+  f(NULL);
 }
