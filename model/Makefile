@@ -20,7 +20,7 @@ all: generated
 generated: generated-stamp
 
 generated-stamp: data.proto
-	protoc --go_out=generated/ data.proto
+	protoc --cpp_out=generated/ --go_out=generated/ data.proto
 	touch $@
 
 clean:
