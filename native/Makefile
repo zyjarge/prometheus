@@ -21,8 +21,8 @@
 
 MAKE_ARTIFACTS = libcomparer.a comparer.o ccomparer.o test_suite test_suite.o
 
-CXXFLAGS += -Wall
-CFLAGS += -Wall
+CXXFLAGS += -Wall -Werror
+CFLAGS += -Wall -Werror
 
 all: test
 
@@ -31,10 +31,10 @@ test: test_suite
 comparer.o: comparer.cpp comparer.hpp
 	$(CXX) $(CXXFLAGS) comparer.cpp -c -o $@
 
-# This target is especially problematic and should deserve attention.
 ccomparer.o: comparer.o comparer.c comparer.h
-	$(CXX) $(CXXFLAGS) comparer.c -c -o $@
+	$(CC) $(CFLAGS) comparer.c -c -o $@
 
+# This will be replaced with utility/repacker before sent for review.
 libcomparer.a: comparer.o ccomparer.o ../model/generated/data.pb.o $(LD_ASSETS)
 	-for i in $(LD_ASSETS) ; do ar x $${i} ; done
 	ar rcs libcomparer.a comparer.o ccomparer.o ../model/generated/data.pb.o *.o

@@ -15,6 +15,10 @@
 
 #include <generated/data.pb.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 const int Compare(const char *l, size_t llen,
                   const char *r, size_t rlen) {
   dto::SampleKey left;
@@ -57,3 +61,7 @@ const int Compare(const char *l, size_t llen,
 
   return 0;
 }
+
+#ifdef __cplusplus
+}
+#endif

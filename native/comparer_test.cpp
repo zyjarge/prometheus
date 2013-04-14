@@ -15,8 +15,8 @@
 
 #include <generated/data.pb.h>
 
-#include "comparer.hpp"
 #include "comparer.h"
+#include "comparer.hpp"
 
 TEST(CompareAnomaly, BothEmpty) {
   std::string left;

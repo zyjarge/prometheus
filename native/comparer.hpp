@@ -14,7 +14,11 @@
 #ifndef COMPARER_HPP
 #define COMPARER_HPP
 
-#include <cstddef>
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Compare examines to byte buffers that contain serialized SampleKey entities
 // and decides how to sort them.
@@ -31,7 +35,11 @@
 // This is implemented in C++ to avoid introducing extra C-based Protocol
 // Buffer dependencies into the runtime.  Unfortunately for direct Go bindings,
 // C must be used.  comparer.h provides this interface.
-const int Compare(const char * left, std::size_t left_length,
-                  const char * right, std::size_t right_length);
+const int Compare(const char * left, size_t left_length,
+                  const char * right, size_t right_length);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
