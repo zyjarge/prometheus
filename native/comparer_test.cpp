@@ -363,3 +363,11 @@ TEST(Protocol, Destroy) {
 
   f(NULL);
 }
+
+TEST(Protocol, New) {
+  leveldb_comparator_t *comparator = new_comparator();
+
+  EXPECT_FALSE(comparator == NULL);
+
+  leveldb_comparator_destroy(comparator);
+}

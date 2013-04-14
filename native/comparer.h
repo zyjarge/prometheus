@@ -15,6 +15,7 @@
 #define COMPARER_H
 
 #include <stddef.h>
+#include <leveldb/c.h>
 
 #define COMPARATOR_NAME "SampleKeyComparator"
 
@@ -51,6 +52,11 @@ const char* name(void *unused);
 //
 // https://code.google.com/p/leveldb/source/browse/include/leveldb/c.h#226
 void destroy(void *unused);
+
+// new_comparator provisions a new LevelDB comparator.
+//
+// https://code.google.com/p/leveldb/source/browse/include/leveldb/c.h#212
+leveldb_comparator_t* new_comparator();
 #ifdef __cplusplus
 }
 #endif

@@ -25,3 +25,7 @@ void destroy(void *unused) {
 const char *name(void *unused) {
   return COMPARATOR_NAME;
 }
+
+leveldb_comparator_t* new_comparator() {
+  return leveldb_comparator_create(NULL, &destroy, &compare, &name);
+}

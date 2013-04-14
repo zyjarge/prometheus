@@ -12,11 +12,12 @@
 # limitations under the License.
 
 # CXXFLAGS will minimally need to include the path to Google Protocol Buffers
-# and Google Test and to the generated Protocol Buffer for the DTO models.
+# and Google Test and to the generated Protocol Buffer for the DTO models and
+# to LevelDB.
 
 # LD_ASSETS will minimally need to include the path to Google Protocol Buffers
-# and Google Test.  On Mac OS X, I was only able to make this succeed by using
-# the static library artifacts.
+# and Google Test and LevelDB and Snappy.  On Mac OS X, I was only able to make
+# this succeed by using the static library artifacts.
 
 MAKE_ARTIFACTS = libcomparer.a comparer.o ccomparer.o test_suite test_suite.o
 
