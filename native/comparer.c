@@ -15,7 +15,7 @@
 #include "comparer.h"
 
 int compare(void *unused, const char *l, size_t llen,
-                  const char *r, size_t rlen) {
+            const char *r, size_t rlen) {
   return Compare(l, llen, r, rlen);
 }
 

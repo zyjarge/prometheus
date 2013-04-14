@@ -40,7 +40,7 @@ extern "C" {
 //
 // https://code.google.com/p/leveldb/source/browse/include/leveldb/c.h#215
 int compare(void *unused, const char *l, size_t llen,
-                  const char *r, size_t rlen);
+            const char *r, size_t rlen);
 
 // name emits the name of this comparator.
 //
