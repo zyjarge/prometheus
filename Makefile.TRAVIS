@@ -60,7 +60,8 @@ go-stamp: bison
 libunwind: libunwind-stamp
 
 libunwind-stamp:
-	$(APT_GET_INSTALL) libunwind
+	$(APT_GET_INSTALL) libunwind7
+	$(APT_GET_INSTALL) libunwind7-dev
 	touch $@
 
 gperftools-$(GPERFTOOLS_VERSION).tar.gz: wget
