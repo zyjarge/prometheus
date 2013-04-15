@@ -94,7 +94,8 @@ gtest-stamp: gtest-$(GTEST_VERSION).zip rsync
 	$(MAKE) -C gtest-$(GTEST_VERSION)
 	rsync -av gtest-$(GTEST_VERSION)/include/ "$(GOPATH)/include/"
 	rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.a "$(GOPATH)/lib/"
-	rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.dylib "$(GOPATH)/lib/"
+	-rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.*dylib* "$(GOPATH)/lib/"
+	-rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.*so* "$(GOPATH)/lib/"
 	touch $@
 
 protobuf-c-$(PROTOBUF_C_VERSION).tar.gz: wget
@@ -190,7 +191,7 @@ snappy-$(SNAPPY_VERSION).tar.gz: wget
 
 snappy: snappy-stamp
 
-snappy-stamp: cc directories rsync snappy-$(SNAPPY_VERSION).tar.gz
+snappy-stamp: cc directories snappy-$(SNAPPY_VERSION).tar.gz
 	tar xzvf snappy-$(SNAPPY_VERSION).tar.gz
 	cd snappy-$(SNAPPY_VERSION) && ./configure --prefix="$(GOPATH)"
 	$(MAKE) -C snappy-$(SNAPPY_VERSION)
