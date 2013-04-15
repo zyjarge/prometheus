@@ -16,7 +16,6 @@ package metric
 import (
 	"code.google.com/p/goprotobuf/proto"
 	"github.com/prometheus/prometheus/coding"
-	"github.com/prometheus/prometheus/coding/indexable"
 	"github.com/prometheus/prometheus/model"
 	dto "github.com/prometheus/prometheus/model/generated"
 	"github.com/prometheus/prometheus/storage/raw/leveldb"
@@ -80,7 +79,7 @@ func (w watermarkState) Get() (key, value coding.Encoder) {
 func (s sampleGroup) Get() (key, value coding.Encoder) {
 	key = coding.NewProtocolBuffer(&dto.SampleKey{
 		Fingerprint:   model.NewFingerprintFromRowKey(s.fingerprint).ToDTO(),
-		Timestamp:     indexable.EncodeTime(s.values[0].time),
+		Timestamp:     proto.Int64(s.values[0].time.Unix()),
 		LastTimestamp: proto.Int64(s.values[len(s.values)-1].time.Unix()),
 		SampleCount:   proto.Uint32(uint32(len(s.values))),
 	})
