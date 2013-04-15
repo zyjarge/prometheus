@@ -15,6 +15,7 @@ package native
 
 // #cgo LDFLAGS: -lleveldb -lprotobuf-c
 // #include <assert.h>
+// #include <stdio.h>
 // #include <stdlib.h>
 // #include "leveldb/c.h"
 // #include "data.pb-c.h"
@@ -32,7 +33,7 @@ package native
 //   Dto__SampleKey *right_key;
 //
 //   left_key = dto__sample_key__unpack(NULL, llen, (const uint8_t *)left);
-//   right_key = dto__sample_key__unpack(NULL, llen, (const uint8_t *)right);
+//   right_key = dto__sample_key__unpack(NULL, rlen, (const uint8_t *)right);
 //
 //   assert(left_key != NULL);
 //   assert(right_key != NULL);

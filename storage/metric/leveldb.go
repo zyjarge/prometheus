@@ -104,7 +104,7 @@ func NewLevelDBMetricPersistence(baseDirectory string) (persistence *LevelDBMetr
 			"Samples by Fingerprint",
 			func() {
 				var err error
-				emission.metricSamples, err = leveldb.NewLevelDBPersistence(baseDirectory+"/samples_by_fingerprint", *samplesByFingerprintCacheSize, 10)
+				emission.metricSamples, err = leveldb.NewLevelDBPersistenceCC(baseDirectory+"/samples_by_fingerprint", *samplesByFingerprintCacheSize, 10)
 				errorChannel <- err
 			},
 		},

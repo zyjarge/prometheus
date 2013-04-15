@@ -13,6 +13,11 @@
 
 TEST_ARTIFACTS = prometheus prometheus.build search_index
 
+include Makefile.INCLUDE
+
+export CGO_CFLAGS = -I $(GOPATH)/include
+export CGO_LDFLAGS = -L $(GOPATH)/lib -lprotobuf-c
+
 all: test
 
 test: build

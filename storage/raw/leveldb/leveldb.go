@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/jmhodges/levigo"
 	"github.com/prometheus/prometheus/coding"
+	"github.com/prometheus/prometheus/native"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/storage/raw"
 	"time"
@@ -37,6 +38,7 @@ type LevelDBPersistence struct {
 	storage      *levigo.DB
 	readOptions  *levigo.ReadOptions
 	writeOptions *levigo.WriteOptions
+	comparator   *native.SampleKeyComparator
 }
 
 // levigoIterator wraps the LevelDB resources in a convenient manner for uniform
@@ -204,6 +206,49 @@ func NewLevelDBPersistence(storageRoot string, cacheCapacity, bitsPerBloomFilter
 	return
 }
 
+func NewLevelDBPersistenceCC(storageRoot string, cacheCapacity, bitsPerBloomFilterEncoded int) (p *LevelDBPersistence, err error) {
+	comparator := native.NewSampleKeyComparator()
+
+	options := levigo.NewOptions()
+	options.SetComparator(comparator.Comparator)
+	options.SetCreateIfMissing(true)
+	options.SetParanoidChecks(*leveldbUseParanoidChecks)
+	compression := levigo.NoCompression
+	if *leveldbUseSnappy {
+		compression = levigo.SnappyCompression
+	}
+	options.SetCompression(compression)
+
+	cache := levigo.NewLRUCache(cacheCapacity)
+	options.SetCache(cache)
+
+	filterPolicy := levigo.NewBloomFilter(bitsPerBloomFilterEncoded)
+	options.SetFilterPolicy(filterPolicy)
+
+	storage, err := levigo.Open(storageRoot, options)
+	if err != nil {
+		return
+	}
+
+	var (
+		readOptions  = levigo.NewReadOptions()
+		writeOptions = levigo.NewWriteOptions()
+	)
+
+	writeOptions.SetSync(*leveldbFlushOnMutate)
+	p = &LevelDBPersistence{
+		cache:        cache,
+		filterPolicy: filterPolicy,
+		options:      options,
+		readOptions:  readOptions,
+		storage:      storage,
+		writeOptions: writeOptions,
+		comparator:   &comparator,
+	}
+
+	return
+}
+
 func (l *LevelDBPersistence) Close() {
 	// These are deferred to take advantage of forced closing in case of stack
 	// unwinding due to anomalies.
@@ -240,6 +285,12 @@ func (l *LevelDBPersistence) Close() {
 	defer func() {
 		if l.writeOptions != nil {
 			l.writeOptions.Close()
+		}
+	}()
+
+	defer func() {
+		if l.comparator != nil {
+			l.comparator.Close()
 		}
 	}()
 

@@ -26,6 +26,9 @@ build:
 test: build data.pb-c.c data.pb-c.h
 	go test .
 
+install: test
+	go install .
+
 data.pb-c.c:
 	echo "Run make in model"
 	false
