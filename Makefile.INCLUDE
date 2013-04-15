@@ -22,9 +22,9 @@ PROTOBUF_C_VERSION := 0.15
 export PATH := $(GOPATH)/bin:$(PATH)
 export LD_LIBRARY_PATH := $(LD_LIBRARY_PATH):$(GOPATH)/lib
 
-export CFLAGS := $(CFLAGS) -O2 -I$(GOPATH)/include -I$(PWD)/model
-export CXXFLAGS := $(CXXFLAGS) -O2 -I$(GOPATH)/include -I$(PWD)/model
-export CPPFLAGS := $(CPPFLAGS) -O2 -I$(GOPATH)/include -I$(PWD)/model
+export CFLAGS := $(CFLAGS) -O2 -fno-omit-frame-pointer -I$(GOPATH)/include -I$(PWD)/model
+export CXXFLAGS := $(CXXFLAGS) -O2 -fno-omit-frame-pointer -I$(GOPATH)/include -I$(PWD)/model
+export CPPFLAGS := $(CPPFLAGS) -O2 -fno-omit-frame-pointer -I$(GOPATH)/include -I$(PWD)/model
 export LDFLAGS := $(LDFLAGS) -L$(GOPATH)/lib
 export LDFLAGS_SUPPLEMENTAL := $(LDFLAGS) -lsnappy -ltcmalloc
 export PKG_CONFIG_PATH := $(GOPATH)/lib/pkgconfig:$(PKG_CONFIG_PATH)
