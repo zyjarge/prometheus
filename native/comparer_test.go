@@ -13,21 +13,14 @@
 
 package native
 
-// #cgo LDFLAGS: -lleveldb -lprotobuf -lstdc++ cppcomparer.o
-// #include "leveldb/c.h"
-// #include "comparer.h"
-import "C"
+import (
+	"testing"
+)
 
-type SampleKeyComparator struct {
-	Comparator *C.leveldb_comparator_t
-}
-
-func NewSampleKeyComparator() SampleKeyComparator {
-	return SampleKeyComparator{
-		Comparator: C.new_comparator(),
+func TestLifecycle(t *testing.T) {
+	comparator := NewSampleKeyComparator()
+	if comparator.Comparator == nil {
+		t.Fatal("comparator.Comparator == nil")
 	}
-}
-
-func (c SampleKeyComparator) Close() {
-	C.leveldb_comparator_destroy(c.Comparator)
+	defer comparator.Close()
 }

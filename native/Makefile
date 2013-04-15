@@ -11,36 +11,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# CXXFLAGS will minimally need to include the path to Google Protocol Buffers
-# and Google Test and to the generated Protocol Buffer for the DTO models and
-# to LevelDB.
+include ../Makefile.INCLUDE
 
-# LD_ASSETS will minimally need to include the path to Google Protocol Buffers
-# and Google Test and LevelDB and Snappy.  On Mac OS X, I was only able to make
-# this succeed by using the static library artifacts.
+MAKE_ARTIFACTS = comparer.o ccomparer.o test_suite test_suite.o
 
-MAKE_ARTIFACTS = libcomparer.a comparer.o ccomparer.o test_suite test_suite.o
+export CXXFLAGS += -Wall -Werror
+export CFLAGS += -Wall -Werror
 
-CXXFLAGS += -Wall -Werror
-CFLAGS += -Wall -Werror
+export CGO_LDFLAGS := $(LDFLAGS) ../model/generated/data.pb.o
 
 all: test
 
 test: test_suite
+	go test -v -x -work .
 
-comparer.o: comparer.cpp comparer.hpp
+cppcomparer.o: comparer.cpp comparer.hpp
 	$(CXX) $(CXXFLAGS) comparer.cpp -c -o $@
 
-ccomparer.o: comparer.o comparer.c comparer.h
+ccomparer.o: comparer.hpp comparer.c comparer.h
 	$(CC) $(CFLAGS) comparer.c -c -o $@
 
-# This will be replaced with utility/repacker before sent for review.
-libcomparer.a: comparer.o ccomparer.o ../model/generated/data.pb.o $(LD_ASSETS)
-	-for i in $(LD_ASSETS) ; do ar x $${i} ; done
-	ar rcs libcomparer.a comparer.o ccomparer.o ../model/generated/data.pb.o *.o
-
-test_suite: libcomparer.a test_suite.o
-	$(CXX) $(LDFLAGS) libcomparer.a test_suite.o -o test_suite
+test_suite: cppcomparer.o ccomparer.o test_suite.o
+	$(CXX) $(LDFLAGS) -lstdc++ cppcomparer.o ccomparer.o test_suite.o ../model/generated/data.pb.o $(GOPATH)/lib/libgtest.a $(GOPATH)/lib/libgtest_main.a $(GOPATH)/lib/libleveldb.a $(GOPATH)/lib/libprotobuf.a $(GOPATH)/lib/libsnappy.a $(GOPATH)/lib/libtcmalloc.a -o test_suite
 	./$@
 
 test_suite.o: comparer_test.cpp

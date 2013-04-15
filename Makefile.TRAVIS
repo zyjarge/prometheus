@@ -11,31 +11,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-GO_VERSION := 1.0.3
-LEVELDB_VERSION := 1.7.0
-PROTOCOL_BUFFERS_VERSION := 2.4.1
-SNAPPY_VERSION := 1.0.5
-GOOGLETEST_VERSION := 1.6.0
-
-OVERLAY_ROOT := ${HOME}/overlay_root
-
-export PATH := $(PATH):$(OVERLAY_ROOT)/bin
-export LD_LIBRARY_PATH := $(LD_LIBRARY_PATH):$(OVERLAY_ROOT)/lib
-
-export CFLAGS := $(CFLAGS) -I$(OVERLAY_ROOT)/include -I$(PWD)/model/generated
-export CXXFLAGS := $(CXXFLAGS) -I$(OVERLAY_ROOT)/include -I$(PWD)/model/generated
-export CPPFLAGS := $(CPPFLAGS) -I$(OVERLAY_ROOT)/include -I$(PWD)/model/generated
-export LDFLAGS := $(LDFLAGS) -L$(OVERLAY_ROOT)/lib
-export CGO_CFLAGS := $(CFLAGS) -lsnappy
-export CGO_LDFLAGS := $(LDFLAGS) -lsnappy
-
-export GO_TEST_FLAGS := "-v"
-
-GO_GET := go get -u -v -x
-APT_GET_INSTALL := sudo apt-get install -y
-WGET := wget -c
+include Makefile.INCLUDE
 
 all: test
+
+directories: directories-stamp
+
+directories-stamp:
+	mkdir -vp "$(GOPATH)/lib"
+	mkdir -vp "$(GOPATH)/include"
+	touch $@
 
 preparation: preparation-stamp
 
@@ -44,24 +29,21 @@ preparation-stamp: build-dependencies
 
 build-dependencies: build-dependencies-stamp
 
-build-dependencies-stamp: bison cc go googletest goprotobuf gorest goskiplist instrumentation leveldb levigo mercurial protoc
-	touch $@
-
-overlay: overlay-stamp
-
-overlay-stamp:
-	[ -d "$(OVERLAY_ROOT)" ] || mkdir -vp $(OVERLAY_ROOT)
+build-dependencies-stamp: bison cc go gtest goprotobuf gorest goskiplist instrumentation leveldb levigo mercurial protoc
 	touch $@
 
 bison: bison-stamp
 
 bison-stamp:
 	[ -x "$$(which bison)" ] || $(APT_GET_INSTALL) bison
+	[ -x "$$(which bison)" ]
+	touch $@
 
 cc: cc-stamp
 
 cc-stamp:
 	[ -x "$$(which cc)" ] || $(APT_GET_INSTALL) build-essential
+	[ -x "$$(which cc)" ]
 	touch $@
 
 go: go-stamp
@@ -72,30 +54,44 @@ go-stamp: bison
 	[ -x "$$(which go)" ]
 	touch $@
 
+gperftools-$(GPERFTOOLS_VERSION).tar.gz: wget
+	$(WGET) https://gperftools.googlecode.com/files/gperftools-$(GPERFTOOLS_VERSION).tar.gz
+
+gperftools-stamp: gperftools-$(GPERFTOOLS_VERSION).tar.gz
+	tar xzvf $<
+	cd gperftools-$(GPERFTOOLS_VERSION) && ./configure --prefix=$(GOPATH)
+	make -C gperftools-$(GPERFTOOLS_VERSION)
+	make -C gperftools-$(GPERFTOOLS_VERSION) install
+	touch $@
+
+gperftools: gperftools-stamp
+
 mercurial: mercurial-stamp
 
 mercurial-stamp:
 	[ -x "$$(which hg)" ] || $(APT_GET_INSTALL) mercurial
+	[ -x "$$(which hg)" ]
 	touch $@
 
 wget: wget-stamp
 
 wget-stamp:
 	[ -x "$$(which wget)" ] || $(APT_GET_INSTALL) wget
+	[ -x "$$(which wget)" ]
 	touch $@
 
-gtest-$(GOOGLETEST_VERSION).zip: wget
+gtest-$(GTEST_VERSION).zip: wget
 	$(WGET) https://googletest.googlecode.com/files/$@
 
-googletest: googletest-stamp
+gtest: gtest-stamp
 
-googletest-stamp: gtest-$(GOOGLETEST_VERSION).zip rsync
-	unzip gtest-$(GOOGLETEST_VERSION).zip
-	cd gtest-$(GOOGLETEST_VERSION) && ./configure
-	$(MAKE) -C gtest-$(GOOGLETEST_VERSION)
-	rsync -av gtest-$(GOOGLETEST_VERSION)/include/ "$(OVERLAY_ROOT)/include/"
-	rsync -av "gtest-$(GOOGLETEST_VERSION)/lib/.libs/"*.a "$(OVERLAY_ROOT)/lib/"
-	rsync -av "gtest-$(GOOGLETEST_VERSION)/lib/.libs/"*.dylib "$(OVERLAY_ROOT)/lib/"
+gtest-stamp: gtest-$(GTEST_VERSION).zip rsync
+	[ -d "gtest-$(GTEST_VERSION)" ] || unzip gtest-$(GTEST_VERSION).zip
+	cd gtest-$(GTEST_VERSION) && ./configure
+	$(MAKE) -C gtest-$(GTEST_VERSION)
+	rsync -av gtest-$(GTEST_VERSION)/include/ "$(GOPATH)/include/"
+	rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.a "$(GOPATH)/lib/"
+	rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.dylib "$(GOPATH)/lib/"
 	touch $@
 
 protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2: wget
@@ -103,11 +99,11 @@ protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2: wget
 
 protoc: protoc-stamp
 
-protoc-stamp: cc protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2 overlay
+protoc-stamp: cc directories protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2
 	([ ! -x "$$(which protoc)" ] && tar xjvf protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2) || true
-	([ ! -x "$$(which protoc)" ] && cd protobuf-$(PROTOCOL_BUFFERS_VERSION) && ./configure --prefix="$(OVERLAY_ROOT)") || true
-	([ ! -x "$$(which protoc)" ] && $(MAKE) -C protobuf-$(PROTOCOL_BUFFERS_VERSION)) || true
-	([ ! -x "$$(which protoc)" ] && $(MAKE) -C protobuf-$(PROTOCOL_BUFFERS_VERSION) install) || true
+	([ ! -x "$$(which protoc)" ] && cd protobuf-$(PROTOCOL_BUFFERS_VERSION) && ./configure --prefix="$(GOPATH)") || true
+	([ ! -x "$$(which protoc)" ] && LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) -C protobuf-$(PROTOCOL_BUFFERS_VERSION)) || true
+	([ ! -x "$$(which protoc)" ] && LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) -C protobuf-$(PROTOCOL_BUFFERS_VERSION) install) || true
 	[ -x "$$(which protoc)" ]
 	touch $@
 
@@ -132,13 +128,13 @@ instrumentation-stamp: go source
 
 leveldb: leveldb-stamp
 
-leveldb-stamp: cc rsync leveldb-$(LEVELDB_VERSION).tar.gz snappy overlay
+leveldb-stamp: cc directories gperftools leveldb-$(LEVELDB_VERSION).tar.gz rsync snappy
 	tar xzvf leveldb-$(LEVELDB_VERSION).tar.gz
-	$(MAKE) -C leveldb-$(LEVELDB_VERSION)
-	rsync -av "leveldb-$(LEVELDB_VERSION)/include/" "$(OVERLAY_ROOT)/include/"
-	-rsync -av "leveldb-$(LEVELDB_VERSION)/"*.*so* "$(OVERLAY_ROOT)/lib/"
-	-rsync -av "leveldb-$(LEVELDB_VERSION)/"*.*dylib* "$(OVERLAY_ROOT)/lib/"
-	rsync -av "leveldb-$(LEVELDB_VERSION)/"*.a "$(OVERLAY_ROOT)/lib/"
+	LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) -C leveldb-$(LEVELDB_VERSION)
+	rsync -av "leveldb-$(LEVELDB_VERSION)/include/" "$(GOPATH)/include/"
+	-rsync -av "leveldb-$(LEVELDB_VERSION)/"*.*so* "$(GOPATH)/lib/"
+	-rsync -av "leveldb-$(LEVELDB_VERSION)/"*.*dylib* "$(GOPATH)/lib/"
+	rsync -av "leveldb-$(LEVELDB_VERSION)/"*.a "$(GOPATH)/lib/"
 	touch $@
 
 leveldb-$(LEVELDB_VERSION).tar.gz: wget
@@ -171,21 +167,20 @@ test: test-stamp
 
 test-stamp: preparation source
 	cd ${GOPATH}/src/github.com/prometheus
-	$(MAKE) build
-	$(MAKE) test
+	LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) build
+	LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) test
 	touch $@
 
 snappy-$(SNAPPY_VERSION).tar.gz: wget
 	$(WGET) http://snappy.googlecode.com/files/snappy-$(SNAPPY_VERSION).tar.gz
-	tar xzvf snappy-$(SNAPPY_VERSION).tar.gz
-	cd snappy-$(SNAPPY_VERSION) && ./configure --prefix="$(OVERLAY_ROOT)"
-	$(MAKE) -C snappy-$(SNAPPY_VERSION)
-	$(MAKE) -C snappy-$(SNAPPY_VERSION) install
 
 snappy: snappy-stamp
-	tar xzvf snappy-$(SNAPPY_VERSION).tar.gz
 
-snappy-stamp: cc overlay rsync snappy-$(SNAPPY_VERSION).tar.gz
+snappy-stamp: cc directories rsync snappy-$(SNAPPY_VERSION).tar.gz
+	tar xzvf snappy-$(SNAPPY_VERSION).tar.gz
+	cd snappy-$(SNAPPY_VERSION) && ./configure --prefix="$(GOPATH)"
+	$(MAKE) -C snappy-$(SNAPPY_VERSION)
+	$(MAKE) -C snappy-$(SNAPPY_VERSION) install
 	touch $@
 
 source: source-stamp
@@ -197,15 +192,16 @@ source-stamp:
 
 clean:
 	-rm *-stamp
-	-rm -rf "$(OVERLAY_ROOT)"
 	-rm -rf leveldb-$(LEVELDB_VERSION)
 	-rm -rf protobuf-$(PROTOCOL_BUFFERS_VERSION)
 	-rm -rf snappy-$(SNAPPY_VERSION)
-	-rm -rf gtest-$(GOOGLETEST_VERSION)
+	-rm -rf gtest-$(GTEST_VERSION)
+	-rm -rf gperftools-$(GPERFTOOLS_VERSION)
 	-rm leveldb-$(LEVELDB_VERSION).tar.gz
 	-rm protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2
 	-rm snappy-$(SNAPPY_VERSION).tar.gz
-	-rm gtest-$(GOOGLETEST_VERSION).zip
+	-rm gtest-$(GTEST_VERSION).zip
+	-rm gperftools-$(GPERFTOOLS_VERSION).tar.gz
 
 
-.PHONY: all bison build-dependencies cc clean go goprotobuf gorest instrumentation leveldb levigo mercurial overlay preparation protoc rsync snappy source test wget vim-common
+.PHONY: all bison build-dependencies cc clean directories go gtest goprotobuf gorest instrumentation leveldb levigo mercurial preparation protoc rsync snappy source test wget vim-common
