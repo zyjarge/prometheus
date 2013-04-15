@@ -21,10 +21,13 @@ import (
 )
 
 var (
-	// firstSupertime is the smallest valid supertime that may be seeked to.
-	firstSupertime = []byte{0, 0, 0, 0, 0, 0, 0, 0}
-	// lastSupertime is the largest valid supertime that may be seeked to.
-	lastSupertime = []byte{127, 255, 255, 255, 255, 255, 255, 255}
+	// firstSupertime is the smallest valid supertime that may be seeked to.  This
+	// is pinned to UNIX epoch.
+	firstSupertime = time.Time{}.Unix()
+	// lastSupertime is the largest valid supertime that may be seeked to,
+	// which is derived by passing the largest allow signed int64 to seconds
+	// past the epoch.
+	lastSupertime = time.Unix(9223372036854775807, 0).Unix()
 )
 
 // Represents the summation of all datastore queries that shall be performed to

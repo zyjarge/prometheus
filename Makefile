@@ -16,7 +16,16 @@ TEST_ARTIFACTS = prometheus prometheus.build search_index
 all: test
 
 test: build
-	go test ./... $(GO_TEST_FLAGS)
+	$(MAKE) -C native test
+	go test ./appstate/... $(GO_TEST_FLAGS)
+	go test ./coding/... $(GO_TEST_FLAGS)
+	go test ./config/... $(GO_TEST_FLAGS)
+	go test ./model/... $(GO_TEST_FLAGS)
+	go test ./retrieval/... $(GO_TEST_FLAGS)
+	go test ./rules/... $(GO_TEST_FLAGS)
+	go test ./storage/... $(GO_TEST_FLAGS)
+	go test ./utility/... $(GO_TEST_FLAGS)
+	go test ./web/... $(GO_TEST_FLAGS)
 
 model:
 	$(MAKE) -C model

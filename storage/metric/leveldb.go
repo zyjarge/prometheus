@@ -17,7 +17,6 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 	"flag"
 	"github.com/prometheus/prometheus/coding"
-	"github.com/prometheus/prometheus/coding/indexable"
 	"github.com/prometheus/prometheus/model"
 	dto "github.com/prometheus/prometheus/model/generated"
 	"github.com/prometheus/prometheus/storage"
@@ -521,14 +520,12 @@ func (l *LevelDBMetricPersistence) refreshHighWatermarks(groups map[model.Finger
 	)
 	for fingerprint, samples := range groups {
 		var (
-			key                   = &dto.Fingerprint{}
+			key                   = fingerprint.ToDTO()
 			value                 = &dto.MetricHighWatermark{}
 			raw                   []byte
 			newestSampleTimestamp = samples[len(samples)-1].Timestamp
 			keyEncoded            = coding.NewProtocolBuffer(key)
 		)
-
-		key.Signature = proto.String(fingerprint.ToRowKey())
 		raw, err = l.metricHighWatermarks.Get(keyEncoded)
 		if err != nil {
 			panic(err)
@@ -610,7 +607,7 @@ func (l *LevelDBMetricPersistence) AppendSamples(samples model.Samples) (err err
 
 			key := &dto.SampleKey{
 				Fingerprint:   fingerprint.ToDTO(),
-				Timestamp:     indexable.EncodeTime(chunk[0].Timestamp),
+				Timestamp:     proto.Int64(chunk[0].Timestamp.Unix()),
 				LastTimestamp: proto.Int64(chunk[take-1].Timestamp.Unix()),
 				SampleCount:   proto.Uint32(uint32(take)),
 			}
@@ -672,36 +669,20 @@ func extractSampleValues(i leveldb.Iterator) (v *dto.SampleValueSeries, err erro
 }
 
 func fingerprintsEqual(l *dto.Fingerprint, r *dto.Fingerprint) bool {
-	if l == r {
-		return true
-	}
-
-	if l == nil && r == nil {
-		return true
-	}
-
-	if r.Signature == l.Signature {
-		return true
-	}
-
-	if *r.Signature == *l.Signature {
-		return true
-	}
-
-	return false
+	return model.NewFingerprintFromDTO(l).Equal(model.NewFingerprintFromDTO(r))
 }
 
 type sampleKeyPredicate func(k *dto.SampleKey) bool
 
 func keyIsOlderThan(t time.Time) sampleKeyPredicate {
 	return func(k *dto.SampleKey) bool {
-		return indexable.DecodeTime(k.Timestamp).After(t)
+		return time.Unix(*k.Timestamp, 0).After(t)
 	}
 }
 
 func keyIsAtMostOld(t time.Time) sampleKeyPredicate {
 	return func(k *dto.SampleKey) bool {
-		return !indexable.DecodeTime(k.Timestamp).After(t)
+		return !time.Unix(*k.Timestamp, 0).After(t)
 	}
 }
 
@@ -776,7 +757,7 @@ func (l *LevelDBMetricPersistence) GetFingerprintsForLabelSet(labelSet model.Lab
 		set := utility.Set{}
 
 		for _, m := range unmarshaled.Member {
-			fp := model.NewFingerprintFromRowKey(*m.Signature)
+			fp := model.NewFingerprintFromDTO(m)
 			set.Add(fp)
 		}
 
@@ -822,7 +803,7 @@ func (l *LevelDBMetricPersistence) GetFingerprintsForLabelName(labelName model.L
 	}
 
 	for _, m := range unmarshaled.Member {
-		fp := model.NewFingerprintFromRowKey(*m.Signature)
+		fp := model.NewFingerprintFromDTO(m)
 		fps = append(fps, fp)
 	}
 
@@ -917,7 +898,7 @@ func (l *LevelDBMetricPersistence) GetValueAtTime(fp model.Fingerprint, t time.T
 	// Candidate for Refactoring
 	k := &dto.SampleKey{
 		Fingerprint: fp.ToDTO(),
-		Timestamp:   indexable.EncodeTime(t),
+		Timestamp:   proto.Int64(t.Unix()),
 	}
 
 	e, err := coding.NewProtocolBuffer(k).Encode()
@@ -988,7 +969,7 @@ func (l *LevelDBMetricPersistence) GetValueAtTime(fp model.Fingerprint, t time.T
 		peekAhead = true
 	}
 
-	firstTime := indexable.DecodeTime(firstKey.Timestamp)
+	firstTime := time.Unix(*firstKey.Timestamp, 0)
 	if t.Before(firstTime) || peekAhead {
 		if !iterator.Previous() {
 			/*
@@ -1021,7 +1002,7 @@ func (l *LevelDBMetricPersistence) GetValueAtTime(fp model.Fingerprint, t time.T
 		 * database.  LevelDB originally seeked to the subsequent element given
 		 * the key, but we need to consider this adjacency instead.
 		 */
-		alternativeTime := indexable.DecodeTime(alternativeKey.Timestamp)
+		alternativeTime := time.Unix(*alternativeKey.Timestamp, 0)
 
 		firstKey = alternativeKey
 		firstValue = alternativeValue
@@ -1082,7 +1063,7 @@ func (l *LevelDBMetricPersistence) GetValueAtTime(fp model.Fingerprint, t time.T
 		sample = nil
 	}
 
-	secondTime := indexable.DecodeTime(secondKey.Timestamp)
+	secondTime := time.Unix(*secondKey.Timestamp, 0)
 
 	totalDelta := secondTime.Sub(firstTime)
 	if totalDelta > s.DeltaAllowance {
@@ -1120,7 +1101,7 @@ func (l *LevelDBMetricPersistence) GetRangeValues(fp model.Fingerprint, i model.
 
 	k := &dto.SampleKey{
 		Fingerprint: fp.ToDTO(),
-		Timestamp:   indexable.EncodeTime(i.OldestInclusive),
+		Timestamp:   proto.Int64(i.OldestInclusive.Unix()),
 	}
 
 	e, err := coding.NewProtocolBuffer(k).Encode()
@@ -1167,7 +1148,7 @@ func (l *LevelDBMetricPersistence) GetRangeValues(fp model.Fingerprint, i model.
 
 		v.Values = append(v.Values, model.SamplePair{
 			Value:     model.SampleValue(*retrievedValue.Value[0].Value),
-			Timestamp: indexable.DecodeTime(retrievedKey.Timestamp),
+			Timestamp: time.Unix(*retrievedKey.Timestamp, 0),
 		})
 	}
 
