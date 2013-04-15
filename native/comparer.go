@@ -61,6 +61,7 @@ package native
 //     value = 1;
 //   }
 //
+//   // N.B.(matt): These explicitly reap the nested fields recursively.
 //   dto__sample_key__free_unpacked(left_key, NULL);
 //   dto__sample_key__free_unpacked(right_key, NULL);
 //
@@ -75,10 +76,24 @@ package native
 //   return leveldb_comparator_create(NULL, CmpDestroy, CmpCompare, CmpName);
 // }
 import "C"
+
+// N.B.(matt): This import block must exist self-standing away from the others
+//             due to cgo AST inspection black magic.
 import (
 	"unsafe"
 )
 
+// SampleKeyComparator provides a LevelDB comparator implemented in C and bound
+// to Go via the cgo bindings which sorts lexicographically/numerically based on
+// the following fields in order of priority:
+//
+// Fingerprint Hash: The FNV-1A 64 bit integer for the fingerprints.
+// Fingerprint First Label Name Letter: The first letter of the first label
+//                                      name.
+// Fingerprint Label Matter Modulus: A single digit of the modulus of the
+//                                   metric's label name and value parts.
+// Fingerprint Last Label Name Letter: The last letter of the last label value.
+// Timestamp: The supertime for the sample group.
 type SampleKeyComparator struct {
 	Comparator *C.leveldb_comparator_t
 }
