@@ -13,33 +13,28 @@
 
 include ../Makefile.INCLUDE
 
-MAKE_ARTIFACTS = comparer.o ccomparer.o test_suite test_suite.o
+MAKE_ARTIFACTS := data.pb-c.c data.pb-c.h
 
-export CXXFLAGS += -Wall -Werror
-export CFLAGS += -Wall -Werror
-
-export CGO_LDFLAGS := $(LDFLAGS) ../model/generated/data.pb.o
+export CGO_CFLAGS = $(CFLAGS) -I$(GOPATH)/include
+export CGO_LDFLAGS = $(LDFLAGS)
 
 all: test
 
-test: test_suite
-	go test -v -x -work .
+build:
+	go build .
 
-cppcomparer.o: comparer.cpp comparer.hpp
-	$(CXX) $(CXXFLAGS) comparer.cpp -c -o $@
+test: build data.pb-c.c data.pb-c.h
+	go test .
 
-ccomparer.o: comparer.hpp comparer.c comparer.h
-	$(CC) $(CFLAGS) comparer.c -c -o $@
+data.pb-c.c:
+	echo "Run make in model"
+	false
 
-test_suite: cppcomparer.o ccomparer.o test_suite.o
-	$(CXX) $(LDFLAGS) -lstdc++ cppcomparer.o ccomparer.o test_suite.o ../model/generated/data.pb.o $(GOPATH)/lib/libgtest.a $(GOPATH)/lib/libgtest_main.a $(GOPATH)/lib/libleveldb.a $(GOPATH)/lib/libprotobuf.a $(GOPATH)/lib/libsnappy.a $(GOPATH)/lib/libtcmalloc.a -o test_suite
-	./$@
-
-test_suite.o: comparer_test.cpp
-	$(CXX) $(CXXFLAGS) $< -c -o $@
+data.pb-c.h:
+	echo "Run make in model"
+	false
 
 clean:
-	-rm -f $(MAKE_ARTIFACTS)
-	rm -f *.o
+	rm -rf $(MAKE_ARTIFACTS)
 
-.PHONY: clean generated test
+.PHONY: build clean test

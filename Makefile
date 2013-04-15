@@ -26,7 +26,7 @@ native: model
 
 build: model native
 	$(MAKE) -C web
-	go build ./...
+	go build .
 
 binary: build
 	go build -o prometheus.build

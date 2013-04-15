@@ -16,14 +16,15 @@ LEVELDB_VERSION := 1.7.0
 PROTOCOL_BUFFERS_VERSION := 2.4.1
 SNAPPY_VERSION := 1.0.5
 GTEST_VERSION := 1.6.0
-GPERFTOOLS_VERSION = 2.0
+GPERFTOOLS_VERSION := 2.0
+PROTOBUF_C_VERSION := 0.15
 
 export PATH := $(GOPATH)/bin:$(PATH)
 export LD_LIBRARY_PATH := $(LD_LIBRARY_PATH):$(GOPATH)/lib
 
-export CFLAGS := $(CFLAGS) -g0 -O2 -I$(GOPATH)/include -I$(PWD)/model
-export CXXFLAGS := $(CXXFLAGS) -g0 -O2 -I$(GOPATH)/include -I$(PWD)/model
-export CPPFLAGS := $(CPPFLAGS) -g0 -O2 -I$(GOPATH)/include -I$(PWD)/model
+export CFLAGS := $(CFLAGS) -O2 -I$(GOPATH)/include -I$(PWD)/model
+export CXXFLAGS := $(CXXFLAGS) -O2 -I$(GOPATH)/include -I$(PWD)/model
+export CPPFLAGS := $(CPPFLAGS) -O2 -I$(GOPATH)/include -I$(PWD)/model
 export LDFLAGS := $(LDFLAGS) -L$(GOPATH)/lib
 export LDFLAGS_SUPPLEMENTAL := $(LDFLAGS) -lsnappy -ltcmalloc
 export PKG_CONFIG_PATH := $(GOPATH)/lib/pkgconfig:$(PKG_CONFIG_PATH)

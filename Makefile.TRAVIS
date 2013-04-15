@@ -32,6 +32,9 @@ build-dependencies: build-dependencies-stamp
 build-dependencies-stamp: bison cc go gtest goprotobuf gorest goskiplist instrumentation leveldb levigo mercurial protoc
 	touch $@
 
+n:
+	$(MAKE) -C native
+
 bison: bison-stamp
 
 bison-stamp:
@@ -93,6 +96,17 @@ gtest-stamp: gtest-$(GTEST_VERSION).zip rsync
 	rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.a "$(GOPATH)/lib/"
 	rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.dylib "$(GOPATH)/lib/"
 	touch $@
+
+protobuf-c-$(PROTOBUF_C_VERSION).tar.gz: wget
+	$(WGET) https://protobuf-c.googlecode.com/files/$@
+
+protobuf-c: protobuf-c-stamp
+
+protobuf-c-stamp: cc directories protobuf-c-$(PROTOBUF_C_VERSION).tar.gz
+	tar xzvf protobuf-c-$(PROTOBUF_C_VERSION).tar.gz
+	cd protobuf-c-$(PROTOBUF_C_VERSION) && ./configure --prefix=$(GOPATH)
+	$(MAKE) -C protobuf-c-$(PROTOBUF_C_VERSION)
+	$(MAKE) -C protobuf-c-$(PROTOBUF_C_VERSION) install
 
 protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2: wget
 	$(WGET) http://protobuf.googlecode.com/files/$@
@@ -197,11 +211,12 @@ clean:
 	-rm -rf snappy-$(SNAPPY_VERSION)
 	-rm -rf gtest-$(GTEST_VERSION)
 	-rm -rf gperftools-$(GPERFTOOLS_VERSION)
+	-rm -rf protobuf-c-$(PROTOBUF_C_VERSION)
 	-rm leveldb-$(LEVELDB_VERSION).tar.gz
 	-rm protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2
 	-rm snappy-$(SNAPPY_VERSION).tar.gz
 	-rm gtest-$(GTEST_VERSION).zip
 	-rm gperftools-$(GPERFTOOLS_VERSION).tar.gz
-
+	-rm protobuf-c-$(PROTOBUF_C_VERSION).tar.gz
 
 .PHONY: all bison build-dependencies cc clean directories go gtest goprotobuf gorest instrumentation leveldb levigo mercurial preparation protoc rsync snappy source test wget vim-common

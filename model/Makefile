@@ -11,9 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# CXXFLAGS will minimally need to include the headers path for Google Protocol
-# Buffers.
-
 MAKE_ARTIFACTS = generated-stamp
 
 export PATH := $(PATH):/Users/mtp/Development/go/bin
@@ -23,8 +20,8 @@ all: generated
 generated: generated-stamp
 
 generated-stamp: data.proto
-	protoc --cpp_out=generated/ --go_out=generated/ data.proto
-	$(CXX) $(CXXFLAGS) generated/data.pb.cc -c -o generated/data.pb.o
+	$(GOPATH)/bin/protoc --go_out=generated/ data.proto
+	$(GOPATH)/bin/protoc-c --c_out=../native/ data.proto
 	touch $@
 
 clean:
