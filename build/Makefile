@@ -106,7 +106,7 @@ leveldb-stamp: cache-stamp cache/leveldb-$(LEVELDB_VERSION).tar.gz cc-stamp gper
 	touch $@
 
 levigo-stamp: cc-stamp gperftools-stamp go-stamp leveldb-stamp snappy-stamp
-	$(GO_GET) github.com/jmhodges/levigo
+	CGO_CFLAGS="-I$(PREFIX)/include" CGO_LDFLAGS="-L$(PREFIX)/lib" $(GO_GET) github.com/jmhodges/levigo
 	touch $@
 
 libunwind-stamp:
