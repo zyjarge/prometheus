@@ -69,4 +69,7 @@ search_index:
 documentation: search_index
 	godoc -http=:6060 -index -index_files='search_index'
 
-.PHONY: advice binary build clean documentation format model native search_index test
+run: binary
+	./prometheus.build $(ARGUMENTS)
+
+.PHONY: advice binary build clean documentation format model native run search_index test
