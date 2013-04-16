@@ -18,4 +18,6 @@ include ../../Makefile.INCLUDE
 all:
 
 clean:
+	rm -rf *
 	git clean -f -d .
+	git reset .
