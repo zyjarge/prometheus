@@ -15,19 +15,16 @@ include ../Makefile.INCLUDE
 
 MAKE_ARTIFACTS := data.pb-c.c data.pb-c.h
 
-export CGO_CFLAGS = $(CFLAGS)
-export CGO_LDFLAGS = $(LDFLAGS)
-
-all: test
+all: install
 
 build:
-	go build .
+	CGO_CFLAGS="$(CFLAGS)" CGO_LDFLAGS="$(LDFLAGS)" go build .
 
 test: build data.pb-c.c data.pb-c.h
-	go test .
+	CGO_CFLAGS="$(CFLAGS)" CGO_LDFLAGS="$(LDFLAGS)" go test .
 
 install: test
-	go install .
+	CGO_CFLAGS="$(CFLAGS)" CGO_LDFLAGS="$(LDFLAGS)" go install .
 
 data.pb-c.c:
 	echo "Run make in model"

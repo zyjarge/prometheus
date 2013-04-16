@@ -47,8 +47,8 @@ wget-stamp: wget-implementation-$(UNAME)-stamp
 	touch $@
 
 clean:
-	rm -rf *.bz2
-	rm -rf *.gz
+	-[ -n "$(REALLY_CLEAN)" ] && rm -rf *.bz2
+	-[ -n "$(REALLY_CLEAN)" ] && rm -rf *.gz
 	rm -rf *-stamp
 
 .PHONY: clean populate

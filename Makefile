@@ -17,9 +17,6 @@ TEST_ARTIFACTS = prometheus prometheus.build search_index
 
 include Makefile.INCLUDE
 
-export CGO_CFLAGS = $(CFLAGS)
-export CGO_LDFLAGS = -lprotobuf-c $(LDFLAGS)
-
 all: test
 
 test: build
