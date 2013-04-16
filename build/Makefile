@@ -82,6 +82,9 @@ gvm-stamp: cc-stamp
   # Prometheus expects go$(GO_VERSION) to be used for building.
 	# This can be achieved by running ``gvm use go$(GO_VERSION)`` before any
 	# other Prometheus make tools.
+	#
+	# Once this build finishes, $(GOPATH) will be mutated and contain some new
+  # packages.
 	# ********** **********
 	#
 	[ -z "${CI}" ] && read -p "Press [ENTER] upon reading." _

@@ -34,13 +34,13 @@ test: build
 	go test ./utility/... $(GO_TEST_FLAGS)
 	go test ./web/... $(GO_TEST_FLAGS)
 
-model:
+model: preparation
 	$(MAKE) -C model
 
-native: model
+native: preparation model
 	$(MAKE) -C native
 
-build: model native
+build: preparation model native
 	$(MAKE) -C web
 	go build .
 
@@ -63,6 +63,9 @@ format:
 advice:
 	go tool vet .
 
+preparation:
+	$(MAKE) -C build
+
 search_index:
 	godoc -index -write_index -index_files='search_index'
 
@@ -72,4 +75,4 @@ documentation: search_index
 run: binary
 	./prometheus.build $(ARGUMENTS)
 
-.PHONY: advice binary build clean documentation format model native run search_index test
+.PHONY: advice binary build clean documentation format model native run search_index preparation test
