@@ -13,6 +13,16 @@
 
 .SUFFIXES:
 
+# Set this to "false" to provide verbose builds of third-party components,
+# namely C and C++ dependencies.
+export SILENCE_THIRD_PARTY_BUILDS := true
+
+ifeq ($(SILENCE_THIRD_PARTY_BUILDS), true)
+export THIRD_PARTY_BUILD_OUTPUT := >/dev/null 2>&1
+else
+export THIRD_PARTY_BUILD_OUTPUT :=
+endif
+
 GO_VERSION := 1.0.3
 LEVELDB_VERSION := 1.7.0
 PROTOCOL_BUFFERS_VERSION := 2.4.1

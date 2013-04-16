@@ -19,6 +19,46 @@ include Makefile.INCLUDE
 
 all: test
 
+advice:
+	go tool vet .
+
+binary: build
+	go build -o prometheus.build
+
+build: preparation model native web
+	go build .
+
+clean:
+	$(MAKE) -C build clean
+	$(MAKE) -C model clean
+	$(MAKE) -C native clean
+	$(MAKE) -C web clean
+	rm -rf $(TEST_ARTIFACTS)
+	-find . -type f -iname '*~' -exec rm '{}' ';'
+	-find . -type f -iname '*#' -exec rm '{}' ';'
+	-find . -type f -iname '.#*' -exec rm '{}' ';'
+
+documentation: search_index
+	godoc -http=:6060 -index -index_files='search_index'
+
+format:
+	find . -iname '*.go' | egrep -v "generated|\.(l|y)\.go" | xargs -n1 gofmt -w -s=true
+
+model: preparation
+	$(MAKE) -C model
+
+native: preparation model
+	$(MAKE) -C native
+
+preparation:
+	$(MAKE) -C build
+
+run: binary
+	./prometheus.build $(ARGUMENTS)
+
+search_index:
+	godoc -index -write_index -index_files='search_index'
+
 test: build
 	$(MAKE) -C native test
 	go test ./appstate/... $(GO_TEST_FLAGS)
@@ -31,45 +71,7 @@ test: build
 	go test ./utility/... $(GO_TEST_FLAGS)
 	go test ./web/... $(GO_TEST_FLAGS)
 
-model: preparation
-	$(MAKE) -C model
-
-native: preparation model
-	$(MAKE) -C native
-
-build: preparation model native
+web: preparation
 	$(MAKE) -C web
-	go build .
-
-binary: build
-	go build -o prometheus.build
-
-clean:
-	$(MAKE) -C build clean
-	$(MAKE) -C model clean
-	$(MAKE) -C native clean
-	$(MAKE) -C web clean
-	rm -rf $(TEST_ARTIFACTS)
-	-find . -type f -iname '*~' -exec rm '{}' ';'
-	-find . -type f -iname '*#' -exec rm '{}' ';'
-	-find . -type f -iname '.#*' -exec rm '{}' ';'
-
-format:
-	find . -iname '*.go' | egrep -v "generated|\.(l|y)\.go" | xargs -n1 gofmt -w -s=true
-
-advice:
-	go tool vet .
-
-preparation:
-	$(MAKE) -C build
-
-search_index:
-	godoc -index -write_index -index_files='search_index'
-
-documentation: search_index
-	godoc -http=:6060 -index -index_files='search_index'
-
-run: binary
-	./prometheus.build $(ARGUMENTS)
 
 .PHONY: advice binary build clean documentation format model native run search_index preparation test

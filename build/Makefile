@@ -53,23 +53,23 @@ go-stamp: gvm-stamp
 	touch $@
 
 goprotobuf-stamp: go-stamp mercurial-stamp protoc-stamp
-	$(GO_GET) code.google.com/p/goprotobuf/proto
-	$(GO_GET) code.google.com/p/goprotobuf/protoc-gen-go
+	$(GO_GET) code.google.com/p/goprotobuf/proto $(THIRD_PARTY_BUILD_OUTPUT)
+	$(GO_GET) code.google.com/p/goprotobuf/protoc-gen-go $(THIRD_PARTY_BUILD_OUTPUT)
 	touch $@
 
 gorest-stamp: go-stamp
-	$(GO_GET) code.google.com/p/gorest
+	$(GO_GET) code.google.com/p/gorest $(THIRD_PARTY_BUILD_OUTPUT)
 	touch $@
 
 goskiplist-stamp: go-stamp
-	$(GO_GET) github.com/ryszard/goskiplist/skiplist
+	$(GO_GET) github.com/ryszard/goskiplist/skiplist $(THIRD_PARTY_BUILD_OUTPUT)
 	touch $@
 
 gperftools-stamp: cache-stamp cache/gperftools-$(GPERFTOOLS_VERSION).tar.gz cc-stamp stack-unwind-support-stamp
-	tar xzvf cache/gperftools-$(GPERFTOOLS_VERSION).tar.gz -C dirty
-	cd dirty/gperftools-$(GPERFTOOLS_VERSION) && ./configure --prefix=$(PREFIX)
-	make -C dirty/gperftools-$(GPERFTOOLS_VERSION)
-	make -C dirty/gperftools-$(GPERFTOOLS_VERSION) install
+	tar xzvf cache/gperftools-$(GPERFTOOLS_VERSION).tar.gz -C dirty $(THIRD_PARTY_BUILD_OUTPUT)
+	cd dirty/gperftools-$(GPERFTOOLS_VERSION) && ./configure --prefix=$(PREFIX) $(THIRD_PARTY_BUILD_OUTPUT)
+	make -C dirty/gperftools-$(GPERFTOOLS_VERSION) $(THIRD_PARTY_BUILD_OUTPUT)
+	make -C dirty/gperftools-$(GPERFTOOLS_VERSION) install $(THIRD_PARTY_BUILD_OUTPUT)
 	touch $@
 
 gvm-stamp: cc-stamp
@@ -91,22 +91,22 @@ gvm-stamp: cc-stamp
 	touch $@
 
 instrumentation-stamp: go-stamp
-	$(GO_GET) github.com/prometheus/client_golang
+	$(GO_GET) github.com/prometheus/client_golang $(THIRD_PARTY_BUILD_OUTPUT)
 	touch $@
 
 leveldb-stamp: cache-stamp cache/leveldb-$(LEVELDB_VERSION).tar.gz cc-stamp gperftools-stamp rsync-stamp snappy-stamp
-	tar xzvf cache/leveldb-$(LEVELDB_VERSION).tar.gz -C dirty
+	tar xzvf cache/leveldb-$(LEVELDB_VERSION).tar.gz -C dirty $(THIRD_PARTY_BUILD_OUTPUT)
 	# The test that LevelDB uses to test for TCMalloc and Snappy is naive and
 	# does not respect LDFLAGS.  :-(
-	CXXFLAGS="-lsnappy -ltcmalloc $(LDFLAGS)" LDFLAGS="-lsnappy -ltcmalloc $(LDFLAGS)" $(MAKE) -C dirty/leveldb-$(LEVELDB_VERSION)
-	rsync -av "dirty/leveldb-$(LEVELDB_VERSION)/include/" "$(PREFIX)/include/"
-	-[ "$(UNAME)" = "Linux" ] && { rsync -av "dirty/leveldb-$(LEVELDB_VERSION)/"*.*so* "$(PREFIX)/lib/" ; }
-	-[ "$(UNAME)" = "Darwin" ] && { rsync -av "dirty/leveldb-$(LEVELDB_VERSION)/"*.*dylib* "$(PREFIX)/lib/" ; }
-	rsync -av "dirty/leveldb-$(LEVELDB_VERSION)/"*.a "$(PREFIX)/lib/"
+	CXXFLAGS="-lsnappy -ltcmalloc $(LDFLAGS)" LDFLAGS="-lsnappy -ltcmalloc $(LDFLAGS)" $(MAKE) -C dirty/leveldb-$(LEVELDB_VERSION) $(THIRD_PARTY_BUILD_OUTPUT)
+	rsync -av "dirty/leveldb-$(LEVELDB_VERSION)/include/" "$(PREFIX)/include/" $(THIRD_PARTY_BUILD_OUTPUT)
+	-[ "$(UNAME)" = "Linux" ] && { rsync -av "dirty/leveldb-$(LEVELDB_VERSION)/"*.*so* "$(PREFIX)/lib/" ; } $(THIRD_PARTY_BUILD_OUTPUT) $(THIRD_PARTY_BUILD_OUTPUT)
+	-[ "$(UNAME)" = "Darwin" ] && { rsync -av "dirty/leveldb-$(LEVELDB_VERSION)/"*.*dylib* "$(PREFIX)/lib/" ; } $(THIRD_PARTY_BUILD_OUTPUT)
+	rsync -av "dirty/leveldb-$(LEVELDB_VERSION)/"*.a "$(PREFIX)/lib/" $(THIRD_PARTY_BUILD_OUTPUT)
 	touch $@
 
 levigo-stamp: cc-stamp gperftools-stamp go-stamp leveldb-stamp snappy-stamp
-	CGO_CFLAGS="-I$(PREFIX)/include" CGO_LDFLAGS="-L$(PREFIX)/lib" $(GO_GET) github.com/jmhodges/levigo
+	CGO_CFLAGS="-I$(PREFIX)/include" CGO_LDFLAGS="-L$(PREFIX)/lib" $(GO_GET) github.com/jmhodges/levigo $(THIRD_PARTY_BUILD_OUTPUT)
 	touch $@
 
 libunwind-stamp:
@@ -131,18 +131,18 @@ noop-target-stamp:
 	touch $@
 
 protobuf-c-stamp: cache-stamp cache/protobuf-c-$(PROTOBUF_C_VERSION).tar.gz cc-stamp
-	tar xzvf cache/protobuf-c-$(PROTOBUF_C_VERSION).tar.gz -C dirty
-	cd dirty/protobuf-c-$(PROTOBUF_C_VERSION) && ./configure --prefix="$(PREFIX)"
-	$(MAKE) -C dirty/protobuf-c-$(PROTOBUF_C_VERSION)
-	$(MAKE) -C dirty/protobuf-c-$(PROTOBUF_C_VERSION) install
+	tar xzvf cache/protobuf-c-$(PROTOBUF_C_VERSION).tar.gz -C dirty $(THIRD_PARTY_BUILD_OUTPUT)
+	cd dirty/protobuf-c-$(PROTOBUF_C_VERSION) && ./configure --prefix="$(PREFIX)" $(THIRD_PARTY_BUILD_OUTPUT)
+	$(MAKE) -C dirty/protobuf-c-$(PROTOBUF_C_VERSION) $(THIRD_PARTY_BUILD_OUTPUT)
+	$(MAKE) -C dirty/protobuf-c-$(PROTOBUF_C_VERSION) install $(THIRD_PARTY_BUILD_OUTPUT)
 	[ -x "$$(which protoc-c)" ] || { echo "protoc-c not found." ; false ; }
 	touch $@
 
 protoc-stamp: cache-stamp cache/protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2 cc-stamp
-	tar xjvf cache/protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2 -C dirty
-	cd dirty/protobuf-$(PROTOCOL_BUFFERS_VERSION) && ./configure --prefix="$(PREFIX)"
-	$(MAKE) -C dirty/protobuf-$(PROTOCOL_BUFFERS_VERSION)
-	$(MAKE) -C dirty/protobuf-$(PROTOCOL_BUFFERS_VERSION) install
+	tar xjvf cache/protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2 -C dirty $(THIRD_PARTY_BUILD_OUTPUT)
+	cd dirty/protobuf-$(PROTOCOL_BUFFERS_VERSION) && ./configure --prefix="$(PREFIX)" $(THIRD_PARTY_BUILD_OUTPUT)
+	$(MAKE) -C dirty/protobuf-$(PROTOCOL_BUFFERS_VERSION) $(THIRD_PARTY_BUILD_OUTPUT)
+	$(MAKE) -C dirty/protobuf-$(PROTOCOL_BUFFERS_VERSION) install $(THIRD_PARTY_BUILD_OUTPUT)
 	[ -x "$$(which protoc)" ] || { echo "protoc not found." ; false ; }
 	touch $@
 
@@ -158,10 +158,10 @@ rsync-stamp: rsync-implementation-$(UNAME)-stamp
 	touch $@
 
 snappy-stamp: cache-stamp cache/snappy-$(SNAPPY_VERSION).tar.gz cc-stamp gperftools-stamp
-	tar xzvf cache/snappy-$(SNAPPY_VERSION).tar.gz -C dirty
-	cd dirty/snappy-$(SNAPPY_VERSION) && ./configure --prefix="$(PREFIX)"
-	$(MAKE) -C dirty/snappy-$(SNAPPY_VERSION)
-	$(MAKE) -C dirty/snappy-$(SNAPPY_VERSION) install
+	tar xzvf cache/snappy-$(SNAPPY_VERSION).tar.gz -C dirty $(THIRD_PARTY_BUILD_OUTPUT)
+	cd dirty/snappy-$(SNAPPY_VERSION) && ./configure --prefix="$(PREFIX)" $(THIRD_PARTY_BUILD_OUTPUT)
+	$(MAKE) -C dirty/snappy-$(SNAPPY_VERSION) $(THIRD_PARTY_BUILD_OUTPUT)
+	$(MAKE) -C dirty/snappy-$(SNAPPY_VERSION) install $(THIRD_PARTY_BUILD_OUTPUT)
 	touch $@
 
 ifeq ($(UNAME), Linux)
