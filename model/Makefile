@@ -13,16 +13,13 @@
 
 MAKE_ARTIFACTS = generated-stamp
 
-# XXX
-export PATH := $(PATH):/Users/mtp/Development/go/bin
-
 all: generated
 
 generated: generated-stamp
 
 generated-stamp: data.proto
-	$(GOPATH)/bin/protoc --go_out=generated/ data.proto
-	$(GOPATH)/bin/protoc-c --c_out=../native/ data.proto
+	protoc --go_out=generated/ data.proto
+	protoc-c --c_out=../native/ data.proto
 	touch $@
 
 clean:

@@ -15,7 +15,7 @@ include ../Makefile.INCLUDE
 
 MAKE_ARTIFACTS := data.pb-c.c data.pb-c.h
 
-export CGO_CFLAGS = $(CFLAGS) -I$(GOPATH)/include
+export CGO_CFLAGS = $(CFLAGS)
 export CGO_LDFLAGS = $(LDFLAGS)
 
 all: test

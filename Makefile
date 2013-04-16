@@ -11,12 +11,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+.SUFFIXES:
+
 TEST_ARTIFACTS = prometheus prometheus.build search_index
 
 include Makefile.INCLUDE
 
-export CGO_CFLAGS = -I $(GOPATH)/include
-export CGO_LDFLAGS = -L $(GOPATH)/lib -lprotobuf-c
+export CGO_CFLAGS = $(CFLAGS)
+export CGO_LDFLAGS = -lprotobuf-c $(LDFLAGS)
 
 all: test
 
@@ -46,6 +48,7 @@ binary: build
 	go build -o prometheus.build
 
 clean:
+	$(MAKE) -C build clean
 	$(MAKE) -C model clean
 	$(MAKE) -C native clean
 	$(MAKE) -C web clean

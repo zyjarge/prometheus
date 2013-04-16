@@ -45,14 +45,14 @@ cc-implementation-Linux-stamp:
 	[ -x "$$(which cc)" ] || $(APT_GET_INSTALL) build-essential
 	touch $@
 
-dependencies-stamp: cache-stamp go-stamp goprotobuf-stamp gorest-stamp goskiplist-stamp instrumentation-stamp levigo-stamp
+dependencies-stamp: cache-stamp go-stamp goprotobuf-stamp gorest-stamp goskiplist-stamp instrumentation-stamp levigo-stamp protobuf-c-stamp
 	touch $@
 
 go-stamp: gvm-stamp
 	[ -x "$$(which go)" ] || { echo "go not found." ; false ; }
 	touch $@
 
-goprotobuf-stamp: go-stamp protoc-stamp
+goprotobuf-stamp: go-stamp mercurial-stamp protoc-stamp
 	$(GO_GET) code.google.com/p/goprotobuf/proto
 	$(GO_GET) code.google.com/p/goprotobuf/protoc-gen-go
 	touch $@
@@ -127,6 +127,14 @@ noop-target-stamp:
 	echo "Not doing anything."
 	touch $@
 
+protobuf-c-stamp: cache-stamp cache/protobuf-c-$(PROTOBUF_C_VERSION).tar.gz cc-stamp
+	tar xzvf cache/protobuf-c-$(PROTOBUF_C_VERSION).tar.gz -C dirty
+	cd dirty/protobuf-c-$(PROTOBUF_C_VERSION) && ./configure --prefix="$(PREFIX)"
+	$(MAKE) -C dirty/protobuf-c-$(PROTOBUF_C_VERSION)
+	$(MAKE) -C dirty/protobuf-c-$(PROTOBUF_C_VERSION) install
+	[ -x "$$(which protoc-c)" ] || { echo "protoc-c not found." ; false ; }
+	touch $@
+
 protoc-stamp: cache-stamp cache/protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2 cc-stamp
 	tar xjvf cache/protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2 -C dirty
 	cd dirty/protobuf-$(PROTOCOL_BUFFERS_VERSION) && ./configure --prefix="$(PREFIX)"
@@ -171,9 +179,6 @@ vim-implementation-Linux-stamp:
 
 vim-stamp: vim-implementation-$(UNAME)-stamp
 	touch $@
-
-# go-dependencies-stamp: go-stamp gorest goskiplist instrumentation levigo mercurial protoc
-# 	touch $@
 
 clean:
 	$(MAKE) -C cache clean

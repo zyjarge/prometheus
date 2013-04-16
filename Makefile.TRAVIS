@@ -11,24 +11,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+.SUFFIXES:
+
 include Makefile.INCLUDE
 
 all: test
 
 preparation:
-  $(MAKE) -C build
+	$(MAKE) -C build
 
 test: preparation
-
-
-test: test-stamp
-
-test-stamp: preparation source
 	cd ${GOPATH}/src/github.com/prometheus
-	LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) build
-	LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) test
+	$(MAKE) -f Makefile build
+	$(MAKE) -f Makefile test
 	touch $@
-
 
 source: source-stamp
 
@@ -40,10 +36,6 @@ source-stamp:
 clean:
 	-rm *-stamp
 
-
-noop-target:
-	echo "Not doing anything."
-
-.PHONY: noop-target
+.PHONY: clean preparation test
 
 .PHONY: all bison build-dependencies cc clean directories go gtest goprotobuf gorest instrumentation leveldb levigo libunwind mercurial noop-target preparation protoc rsync snappy source stack-unwind-support test wget vim-common
