@@ -13,6 +13,7 @@
 
 MAKE_ARTIFACTS = generated-stamp
 
+# XXX
 export PATH := $(PATH):/Users/mtp/Development/go/bin
 
 all: generated

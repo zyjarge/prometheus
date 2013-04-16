@@ -15,175 +15,11 @@ include Makefile.INCLUDE
 
 all: test
 
-directories: directories-stamp
+preparation:
+  $(MAKE) -C build
 
-directories-stamp:
-	mkdir -vp "$(GOPATH)/lib"
-	mkdir -vp "$(GOPATH)/include"
-	touch $@
+test: preparation
 
-preparation: preparation-stamp
-
-preparation-stamp: build-dependencies
-	touch $@
-
-build-dependencies: build-dependencies-stamp
-
-build-dependencies-stamp: bison cc go gtest goprotobuf gorest goskiplist instrumentation leveldb levigo mercurial protoc
-	touch $@
-
-n:
-	$(MAKE) -C native
-
-bison: bison-stamp
-
-bison-stamp:
-	[ -x "$$(which bison)" ] || $(APT_GET_INSTALL) bison
-	[ -x "$$(which bison)" ]
-	touch $@
-
-cc: cc-stamp
-
-cc-stamp:
-	[ -x "$$(which cc)" ] || $(APT_GET_INSTALL) build-essential
-	[ -x "$$(which cc)" ]
-	touch $@
-
-go: go-stamp
-
-go-stamp: bison
-	gvm install go$(GO_VERSION) || true
-	gvm use go$(GO_VERSION) || true
-	[ -x "$$(which go)" ]
-	touch $@
-
-libunwind: libunwind-stamp
-
-libunwind-stamp:
-	$(APT_GET_INSTALL) libunwind7
-	$(APT_GET_INSTALL) libunwind7-dev
-	touch $@
-
-gperftools-$(GPERFTOOLS_VERSION).tar.gz: wget
-	$(WGET) https://gperftools.googlecode.com/files/gperftools-$(GPERFTOOLS_VERSION).tar.gz
-
-gperftools-stamp: gperftools-$(GPERFTOOLS_VERSION).tar.gz libunwind
-	tar xzvf $<
-	cd gperftools-$(GPERFTOOLS_VERSION) && ./configure --prefix=$(GOPATH)
-	make -C gperftools-$(GPERFTOOLS_VERSION)
-	make -C gperftools-$(GPERFTOOLS_VERSION) install
-	touch $@
-
-gperftools: gperftools-stamp
-
-mercurial: mercurial-stamp
-
-mercurial-stamp:
-	[ -x "$$(which hg)" ] || $(APT_GET_INSTALL) mercurial
-	[ -x "$$(which hg)" ]
-	touch $@
-
-wget: wget-stamp
-
-wget-stamp:
-	[ -x "$$(which wget)" ] || $(APT_GET_INSTALL) wget
-	[ -x "$$(which wget)" ]
-	touch $@
-
-gtest-$(GTEST_VERSION).zip: wget
-	$(WGET) https://googletest.googlecode.com/files/$@
-
-gtest: gtest-stamp
-
-gtest-stamp: gtest-$(GTEST_VERSION).zip rsync
-	[ -d "gtest-$(GTEST_VERSION)" ] || unzip gtest-$(GTEST_VERSION).zip
-	cd gtest-$(GTEST_VERSION) && ./configure
-	$(MAKE) -C gtest-$(GTEST_VERSION)
-	rsync -av gtest-$(GTEST_VERSION)/include/ "$(GOPATH)/include/"
-	rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.a "$(GOPATH)/lib/"
-	-rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.*dylib* "$(GOPATH)/lib/"
-	-rsync -av "gtest-$(GTEST_VERSION)/lib/.libs/"*.*so* "$(GOPATH)/lib/"
-	touch $@
-
-protobuf-c-$(PROTOBUF_C_VERSION).tar.gz: wget
-	$(WGET) https://protobuf-c.googlecode.com/files/$@
-
-protobuf-c: protobuf-c-stamp
-
-protobuf-c-stamp: cc directories protobuf-c-$(PROTOBUF_C_VERSION).tar.gz
-	tar xzvf protobuf-c-$(PROTOBUF_C_VERSION).tar.gz
-	cd protobuf-c-$(PROTOBUF_C_VERSION) && ./configure --prefix=$(GOPATH)
-	$(MAKE) -C protobuf-c-$(PROTOBUF_C_VERSION)
-	$(MAKE) -C protobuf-c-$(PROTOBUF_C_VERSION) install
-
-protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2: wget
-	$(WGET) http://protobuf.googlecode.com/files/$@
-
-protoc: protoc-stamp
-
-protoc-stamp: cc directories protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2
-	([ ! -x "$$(which protoc)" ] && tar xjvf protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2) || true
-	([ ! -x "$$(which protoc)" ] && cd protobuf-$(PROTOCOL_BUFFERS_VERSION) && ./configure --prefix="$(GOPATH)") || true
-	([ ! -x "$$(which protoc)" ] && LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) -C protobuf-$(PROTOCOL_BUFFERS_VERSION)) || true
-	([ ! -x "$$(which protoc)" ] && LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) -C protobuf-$(PROTOCOL_BUFFERS_VERSION) install) || true
-	[ -x "$$(which protoc)" ]
-	touch $@
-
-gorest: gorest-stamp
-
-gorest-stamp: go source
-	$(GO_GET) code.google.com/p/gorest
-	touch $@
-
-goprotobuf: goprotobuf-stamp
-
-goprotobuf-stamp: go protoc source
-	$(GO_GET) code.google.com/p/goprotobuf/proto
-	$(GO_GET) code.google.com/p/goprotobuf/protoc-gen-go
-	touch $@
-
-instrumentation: instrumentation-stamp
-
-instrumentation-stamp: go source
-	$(GO_GET) github.com/prometheus/client_golang
-	touch $@
-
-leveldb: leveldb-stamp
-
-leveldb-stamp: cc directories gperftools leveldb-$(LEVELDB_VERSION).tar.gz rsync snappy
-	tar xzvf leveldb-$(LEVELDB_VERSION).tar.gz
-	LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) -C leveldb-$(LEVELDB_VERSION)
-	rsync -av "leveldb-$(LEVELDB_VERSION)/include/" "$(GOPATH)/include/"
-	-rsync -av "leveldb-$(LEVELDB_VERSION)/"*.*so* "$(GOPATH)/lib/"
-	-rsync -av "leveldb-$(LEVELDB_VERSION)/"*.*dylib* "$(GOPATH)/lib/"
-	rsync -av "leveldb-$(LEVELDB_VERSION)/"*.a "$(GOPATH)/lib/"
-	touch $@
-
-leveldb-$(LEVELDB_VERSION).tar.gz: wget
-	$(WGET) http://leveldb.googlecode.com/files/leveldb-$(LEVELDB_VERSION).tar.gz
-
-levigo: levigo-stamp
-
-levigo-stamp: leveldb go snappy source
-	$(GO_GET) github.com/jmhodges/levigo
-	touch $@
-
-goskiplist: goskiplist-stamp
-
-goskiplist-stamp: go source
-	$(GO_GET) github.com/ryszard/goskiplist/skiplist
-	touch $@
-
-rsync: rsync-stamp
-
-rsync-stamp:
-	[ -x "$$(which rsync)" ] || $(APT_GET_INSTALL) rsync
-
-vim-common: vim-common-stamp
-
-vim-common-stamp:
-	$(APT_GET_INSTALL) vim-common
-	touch $@
 
 test: test-stamp
 
@@ -193,17 +29,6 @@ test-stamp: preparation source
 	LDFLAGS="$(LDFLAGS_SUPPLEMENTAL)" $(MAKE) test
 	touch $@
 
-snappy-$(SNAPPY_VERSION).tar.gz: wget
-	$(WGET) http://snappy.googlecode.com/files/snappy-$(SNAPPY_VERSION).tar.gz
-
-snappy: snappy-stamp
-
-snappy-stamp: cc directories snappy-$(SNAPPY_VERSION).tar.gz
-	tar xzvf snappy-$(SNAPPY_VERSION).tar.gz
-	cd snappy-$(SNAPPY_VERSION) && ./configure --prefix="$(GOPATH)"
-	$(MAKE) -C snappy-$(SNAPPY_VERSION)
-	$(MAKE) -C snappy-$(SNAPPY_VERSION) install
-	touch $@
 
 source: source-stamp
 
@@ -214,17 +39,11 @@ source-stamp:
 
 clean:
 	-rm *-stamp
-	-rm -rf leveldb-$(LEVELDB_VERSION)
-	-rm -rf protobuf-$(PROTOCOL_BUFFERS_VERSION)
-	-rm -rf snappy-$(SNAPPY_VERSION)
-	-rm -rf gtest-$(GTEST_VERSION)
-	-rm -rf gperftools-$(GPERFTOOLS_VERSION)
-	-rm -rf protobuf-c-$(PROTOBUF_C_VERSION)
-	-rm leveldb-$(LEVELDB_VERSION).tar.gz
-	-rm protobuf-$(PROTOCOL_BUFFERS_VERSION).tar.bz2
-	-rm snappy-$(SNAPPY_VERSION).tar.gz
-	-rm gtest-$(GTEST_VERSION).zip
-	-rm gperftools-$(GPERFTOOLS_VERSION).tar.gz
-	-rm protobuf-c-$(PROTOBUF_C_VERSION).tar.gz
 
-.PHONY: all bison build-dependencies cc clean directories go gtest goprotobuf gorest instrumentation leveldb levigo libunwind mercurial preparation protoc rsync snappy source test wget vim-common
+
+noop-target:
+	echo "Not doing anything."
+
+.PHONY: noop-target
+
+.PHONY: all bison build-dependencies cc clean directories go gtest goprotobuf gorest instrumentation leveldb levigo libunwind mercurial noop-target preparation protoc rsync snappy source stack-unwind-support test wget vim-common

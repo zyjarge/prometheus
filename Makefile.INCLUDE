@@ -19,18 +19,24 @@ GTEST_VERSION := 1.6.0
 GPERFTOOLS_VERSION := 2.0
 PROTOBUF_C_VERSION := 0.15
 
-export PATH := $(GOPATH)/bin:$(PATH)
-export LD_LIBRARY_PATH := $(LD_LIBRARY_PATH):$(GOPATH)/lib
+UNAME := $(shell uname)
 
-export CFLAGS := $(CFLAGS) -O2 -fno-omit-frame-pointer -I$(GOPATH)/include -I$(PWD)/model
-export CXXFLAGS := $(CXXFLAGS) -O2 -fno-omit-frame-pointer -I$(GOPATH)/include -I$(PWD)/model
-export CPPFLAGS := $(CPPFLAGS) -O2 -fno-omit-frame-pointer -I$(GOPATH)/include -I$(PWD)/model
-export LDFLAGS := $(LDFLAGS) -L$(GOPATH)/lib
-export LDFLAGS_SUPPLEMENTAL := $(LDFLAGS) -lsnappy -ltcmalloc
-export PKG_CONFIG_PATH := $(GOPATH)/lib/pkgconfig:$(PKG_CONFIG_PATH)
+export PREFIX=$(PWD)/build/root
+
+export PATH := $(PREFIX)/bin:$(GOPATH)/bin:$(PATH)
+export LD_LIBRARY_PATH := $(PREFIX)/lib:$(LD_LIBRARY_PATH)
+
+export CFLAGS := $(CFLAGS) -O2 -fno-omit-frame-pointer -I$(PREFIX)/include
+export CXXFLAGS := $(CXXFLAGS) -O2 -fno-omit-frame-pointer -I$(PREFIX)/include
+export CPPFLAGS := $(CPPFLAGS) -O2 -fno-omit-frame-pointer -I$(PREFIX)/include
+export LDFLAGS := $(LDFLAGS) -L$(PREFIX)/lib
+export PKG_CONFIG_PATH := $(PREFIX)/lib/pkgconfig:$(PKG_CONFIG_PATH)
 
 export GO_TEST_FLAGS := "-v"
 
 GO_GET := go get -u -v -x
 APT_GET_INSTALL := sudo apt-get install -y
-WGET := wget -c
+BREW_INSTALL := brew install
+# By default, wget sets the creation time to match the server's, which throws
+# off Make.  :-(
+WGET := wget --no-use-server-timestamps -c
