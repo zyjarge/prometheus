@@ -36,6 +36,9 @@ all: test
 advice:
 	go tool vet .
 
+benchmarks: build
+	go build $(BUILDFLAGS) -o benchmarks.build ./benchmarks/...
+
 binary: build
 	go build $(BUILDFLAGS) -o prometheus.build
 
@@ -69,6 +72,9 @@ preparation: source_path
 
 run: binary
 	./prometheus.build $(ARGUMENTS)
+
+run_benchmarks: benchmarks
+	./benchmarks.build $(ARGUMENTS)
 
 search_index:
 	godoc -index -write_index -index_files='search_index'
