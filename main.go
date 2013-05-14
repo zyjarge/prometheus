@@ -38,12 +38,9 @@ const (
 var (
 	printVersion                 = flag.Bool("version", false, "print version information")
 	configFile                   = flag.String("configFile", "prometheus.conf", "Prometheus configuration file name.")
-	metricsStoragePath           = flag.String("metricsStoragePath", "/tmp/metrics", "Base path for metrics storage.")
 	scrapeResultsQueueCapacity   = flag.Int("scrapeResultsQueueCapacity", 4096, "The size of the scrape results queue.")
 	ruleResultsQueueCapacity     = flag.Int("ruleResultsQueueCapacity", 4096, "The size of the rule results queue.")
 	concurrentRetrievalAllowance = flag.Int("concurrentRetrievalAllowance", 15, "The number of concurrent metrics retrieval requests allowed.")
-	diskAppendQueueCapacity      = flag.Int("queue.diskAppendCapacity", 1000000, "The size of the queue for items that are pending writing to disk.")
-	memoryAppendQueueCapacity    = flag.Int("queue.memoryAppendCapacity", 10000, "The size of the queue for items that are pending writing to memory.")
 
 	headCompactInterval = flag.Duration("compact.headInterval", 10*3*time.Minute, "The amount of time between head compactions.")
 	bodyCompactInterval = flag.Duration("compact.bodyInterval", 10*5*time.Minute, "The amount of time between body compactions.")
@@ -187,13 +184,7 @@ func main() {
 		log.Fatalf("Error loading configuration from %s: %v", *configFile, err)
 	}
 
-	ts, err := metric.NewTieredStorage(uint(*diskAppendQueueCapacity), 100, time.Second*30, time.Second*1, time.Second*20, *metricsStoragePath)
-	if err != nil {
-		log.Fatalf("Error opening storage: %s", err)
-	}
-	if ts == nil {
-		log.Fatalln("Nil tiered storage.")
-	}
+	ts := MustNewTieredStorage(StorageSettings)
 
 	scrapeResults := make(chan format.Result, *scrapeResultsQueueCapacity)
 	ruleResults := make(chan *rules.Result, *ruleResultsQueueCapacity)
