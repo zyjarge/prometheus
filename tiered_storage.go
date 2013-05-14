@@ -9,7 +9,6 @@ import (
 
 type storageSettings struct {
 	FlushInterval  *time.Duration
-	WriteInterval  *time.Duration
 	TTL            *time.Duration
 	DiskQueueDepth *uint
 	Path           *string
@@ -18,7 +17,6 @@ type storageSettings struct {
 
 var StorageSettings = storageSettings{
 	flag.Duration("storage.memory.flushInterval", time.Second*30, "how often to flush memory samples to disk"),
-	flag.Duration("storage.memory.writeInterval", time.Second*1, "how often to write samples to disk [deprecated]"),
 	flag.Duration("storage.memory.ttl", time.Second*20, "age of flushed samples"),
 	flag.Uint("storage.disk.queueDepth", 1000000, "maximum pending writes"),
 	flag.String("storage.disk.path", "/tmp/metrics", "base path for metrics storage"),
@@ -30,7 +28,6 @@ func MustNewTieredStorage(settings storageSettings) *metric.TieredStorage {
 		*settings.DiskQueueDepth,
 		*settings.ViewQueueDepth,
 		*settings.FlushInterval,
-		*settings.WriteInterval,
 		*settings.TTL,
 		*settings.Path,
 	)
