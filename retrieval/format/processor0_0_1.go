@@ -78,16 +78,29 @@ func (p *processor001) Process(stream io.ReadCloser, timestamp time.Time, baseLa
 	for _, entity := range entities {
 		for _, value := range entity.Metric.Value {
 			metric := model.Metric{}
-			for label, labelValue := range baseLabels {
-				metric[label] = labelValue
-			}
-
 			for label, labelValue := range entity.BaseLabels {
 				metric[model.LabelName(label)] = model.LabelValue(labelValue)
 			}
 
 			for label, labelValue := range value.Labels {
 				metric[model.LabelName(label)] = model.LabelValue(labelValue)
+			}
+
+			for label, labelValue := range baseLabels {
+				switch label {
+				case model.InstanceLabel:
+					if _, exists := metric[model.InstanceLabel]; exists {
+						metric[model.ExporterInstanceLabel] = labelValue
+						continue
+					}
+				case model.JobLabel:
+					if _, exists := metric[model.JobLabel]; exists {
+						metric[model.ExporterJobLabel] = labelValue
+						continue
+					}
+				}
+
+				metric[label] = labelValue
 			}
 
 			switch entity.Metric.MetricType {

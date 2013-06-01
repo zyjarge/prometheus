@@ -20,6 +20,10 @@ const (
 	JobLabel = LabelName("job")
 	// The label name indicating the instance from which a timeseries was scraped.
 	InstanceLabel = LabelName("instance")
+	// The label name indicating the exporter job from which a timeseries was scraped.
+	ExporterJobLabel = LabelName("exporter_job")
+	// The label name indicating the exporter instance from which a timeseries was scraped.
+	ExporterInstanceLabel = LabelName("exporter_instance")
 	// The metric name for the synthetic health variable.
 	ScrapeHealthMetricName = LabelValue("up")
 	// The metric name for synthetic alert timeseries.
