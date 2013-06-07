@@ -22,6 +22,8 @@ import (
 	"github.com/prometheus/prometheus/storage/raw"
 	"github.com/prometheus/prometheus/storage/raw/leveldb"
 	"time"
+	"log"
+	"sort"
 )
 
 // processor models a post-processing agent that performs work given a sample
@@ -164,6 +166,9 @@ func (p CompactionProcessor) Apply(sampleIterator leveldb.Iterator, samplesPersi
 
 		// If the number of pending writes equals the target group size
 		case len(pendingSamples) == p.MinimumGroupSize:
+			if !sort.IsSorted(pendingSamples) {
+				log.Fatalf("Samples: %v", pendingSamples)
+			}
 			newSampleKey := pendingSamples.ToSampleKey(fingerprint)
 			key := coding.NewPBEncoder(newSampleKey.ToDTO())
 			value := coding.NewPBEncoder(pendingSamples.ToDTO())
@@ -209,6 +214,9 @@ func (p CompactionProcessor) Apply(sampleIterator leveldb.Iterator, samplesPersi
 	}
 
 	if len(sampleValues) > 0 || len(pendingSamples) > 0 {
+		if !sort.IsSorted(pendingSamples) {
+			log.Fatalf("Samples: %v", pendingSamples)
+		}
 		pendingSamples = append(sampleValues, pendingSamples...)
 		newSampleKey := pendingSamples.ToSampleKey(fingerprint)
 		key := coding.NewPBEncoder(newSampleKey.ToDTO())

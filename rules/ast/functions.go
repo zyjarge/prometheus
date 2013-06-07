@@ -20,6 +20,7 @@ import (
 	"github.com/prometheus/prometheus/utility"
 	"sort"
 	"time"
+"log"
 )
 
 type Function struct {
@@ -117,6 +118,7 @@ func deltaImpl(timestamp time.Time, view *viewAdapter, args []Node) interface{} 
 		// the delta results are distorted and temporal aliasing occurs (ugly
 		// bumps). This effect is corrected for below.
 		intervalCorrection := model.SampleValue(targetInterval) / model.SampleValue(sampledInterval)
+	oldResultValue := resultValue
 		resultValue *= intervalCorrection
 
 		resultSample := model.Sample{
@@ -125,6 +127,16 @@ func deltaImpl(timestamp time.Time, view *viewAdapter, args []Node) interface{} 
 			Timestamp: timestamp,
 		}
 		resultVector = append(resultVector, resultSample)
+		if resultValue < 0 {
+			log.Printf("\nNegative rate: %v\n", resultSample)
+			log.Printf("Sample range: %v\n", samples)
+			log.Printf("sampledInterval: %v\n", sampledInterval)
+			log.Printf("targetInterval: %v\n", targetInterval)
+			log.Printf("intervalCorrection: %v\n", intervalCorrection)
+			log.Printf("old result value: %v\n", oldResultValue)
+			log.Printf("counterCorrection: %v\n", counterCorrection)
+			log.Printf("fingerprint: %v\n", model.NewFingerprintFromMetric(samples.Metric))
+		}
 	}
 	return resultVector
 }

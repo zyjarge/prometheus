@@ -566,6 +566,9 @@ func (l *LevelDBMetricPersistence) AppendSamples(samples model.Samples) (err err
 			}
 
 			chunk := group[0:take]
+			if !sort.IsSorted(chunk) {
+				log.Fatalf("Chunk: %v", chunk)
+			}
 			group = group[take:lengthOfGroup]
 
 			key := model.SampleKey{
