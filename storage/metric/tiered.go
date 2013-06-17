@@ -342,15 +342,20 @@ func (t *TieredStorage) seriesTooOld(f *model.Fingerprint, i time.Time) (bool, e
 		value := &dto.MetricHighWatermark{}
 		present, err := t.DiskStorage.MetricHighWatermarks.Get(f.ToDTO(), value)
 		if err != nil {
+      log.Printf("Error reading watermark from disk")
 			return false, err
 		}
 		if present {
 			wmTime := time.Unix(*value.Timestamp, 0).UTC()
 			t.wmCache.Set(f, &Watermarks{High: wmTime})
+      log.Printf("Result from disk: %v == %v > %v", wmTime.Before(i), i, wmTime)
 			return wmTime.Before(i), nil
 		}
+    log.Printf("Not present on disk")
+    t.wmCache.Set(f, &Watermarks{High: time.Time{}})
 		return true, nil
 	}
+  log.Printf("Result from memory: %v == %v > %v", wm.High.Before(i), i, wm.High)
 	return wm.High.Before(i), nil
 }
 
@@ -666,6 +671,7 @@ func (t *TieredStorage) GetMetricForFingerprint(f *model.Fingerprint) (model.Met
 	}
 	if m == nil {
 		m, err = t.DiskStorage.GetMetricForFingerprint(f)
+    t.memoryArena.fingerprintToSeries[*f] = newStream(m)
 	}
 	return m, err
 }

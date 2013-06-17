@@ -405,6 +405,7 @@ Prometheus.Graph.prototype.showGraph = function() {
     interpolation: "linear",
     series: self.data,
     min: "auto",
+    strokeWidth: 1
   });
 
   var xAxis = new Rickshaw.Graph.Axis.Time({ graph: self.rickshawGraph });

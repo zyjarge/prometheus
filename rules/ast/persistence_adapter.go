@@ -108,11 +108,12 @@ func (v *viewAdapter) chooseClosestSample(samples model.Values, timestamp time.T
 }
 
 func (v *viewAdapter) GetValueAtTime(fingerprints model.Fingerprints, timestamp time.Time) (samples Vector, err error) {
-	timer := v.stats.GetTimer(stats.GetValueAtTimeTime).Start()
 	for _, fingerprint := range fingerprints {
 		sampleCandidates := v.view.GetValueAtTime(fingerprint, timestamp)
 		samplePair := v.chooseClosestSample(sampleCandidates, timestamp)
+	timer := v.stats.GetTimer(stats.GetValueAtTimeTime).Start()
 		m, err := v.storage.GetMetricForFingerprint(fingerprint)
+	timer.Stop()
 		if err != nil {
 			continue
 		}
@@ -124,7 +125,6 @@ func (v *viewAdapter) GetValueAtTime(fingerprints model.Fingerprints, timestamp 
 			})
 		}
 	}
-	timer.Stop()
 	return samples, err
 }
 
