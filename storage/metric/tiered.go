@@ -350,6 +350,7 @@ func (t *TieredStorage) seriesTooOld(f *clientmodel.Fingerprint, i time.Time) (b
 }
 
 func (t *TieredStorage) renderView(viewJob viewJob) {
+  fmt.Printf("============ renderView() ============\n")
 	// Telemetry.
 	var err error
 	begin := time.Now()
@@ -371,13 +372,16 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 	var diskPresent = true
 
 	extractionTimer := viewJob.stats.GetTimer(stats.ViewDataExtractionTime).Start()
+  fmt.Printf("Fingerprints: %v\n", len(scans))
 	for _, scanJob := range scans {
+    fmt.Printf("Ops: %v\n", len(scanJob.operations))
 		old, err := t.seriesTooOld(scanJob.fingerprint, *scanJob.operations[0].CurrentTime())
 		if err != nil {
 			log.Printf("Error getting watermark from cache for %s: %s", scanJob.fingerprint, err)
 			continue
 		}
 		if old {
+      fmt.Printf("Skipping old series. First time: %v\n", *scanJob.operations[0].CurrentTime())
 			continue
 		}
 
@@ -386,8 +390,10 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 
 		standingOps := scanJob.operations
 		memValues := t.memoryArena.CloneSamples(scanJob.fingerprint)
+    fmt.Printf("Cloned %v samples from memory.\n", len(memValues))
 
 		for len(standingOps) > 0 {
+      fmt.Printf("Iteration over all ops.")
 			// Abort the view rendering if the caller (MakeView) has timed out.
 			if len(viewJob.abort) > 0 {
 				return
@@ -398,6 +404,7 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 
 			currentChunk := chunk{}
 			// If we aimed before the oldest value in memory, load more data from disk.
+      fmt.Printf("Iteration over all ops.")
 			if (len(memValues) == 0 || memValues.FirstTimeAfter(targetTime)) && diskPresent && seriesPresent {
 				diskPrepareTimer := viewJob.stats.GetTimer(stats.ViewDiskPreparationTime).Start()
 				// Conditionalize disk access.
