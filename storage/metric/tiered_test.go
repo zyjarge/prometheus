@@ -729,3 +729,30 @@ func testTruncateBefore(t test.Tester) {
 func TestTruncateBefore(t *testing.T) {
 	testTruncateBefore(t)
 }
+
+func TestSeriesTooOld(t *testing.T) {
+	scenarios := []struct {
+		fpCount int
+	}{
+		// Too old from cache.
+		// Too old from memory.
+		// Too old from disk.
+		// Too old no watermarks.
+		// Current from cache.
+		// Current from memory.
+		// Current from disk.
+		{
+			labels:  clientmodel.LabelSet{},
+			fpCount: 0,
+		}, {
+			labels: clientmodel.LabelSet{
+				clientmodel.MetricNameLabel: "http_requests",
+			},
+			fpCount: 2,
+		},
+	}
+
+	tiered, closer := NewTestTieredStorage(t)
+	defer closer.Close()
+
+}
