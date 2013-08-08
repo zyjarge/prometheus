@@ -74,6 +74,7 @@ func (p TargetPool) Stop() {
 }
 
 func (p *TargetPool) AddTarget(target Target) {
+	target.SetBaseLabels(target.BaseLabels().Merge(p.manager.GlobalLabels()))
 	p.addTargetQueue <- target
 }
 
@@ -87,6 +88,10 @@ func (p *TargetPool) addTarget(target Target) {
 func (p *TargetPool) ReplaceTargets(newTargets []Target) {
 	p.Lock()
 	defer p.Unlock()
+
+	for _, target := range newTargets {
+		target.SetBaseLabels(target.BaseLabels().Merge(p.manager.GlobalLabels()))
+	}
 
 	// If there is anything remaining in the queue for effectuation, clear it out,
 	// because the last mutation should win.

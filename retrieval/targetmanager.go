@@ -31,12 +31,15 @@ type TargetManager interface {
 	Remove(t Target)
 	AddTargetsFromConfig(config config.Config)
 	Pools() map[string]*TargetPool
+	SetGlobalLabels(clientmodel.LabelSet)
+	GlobalLabels() clientmodel.LabelSet
 }
 
 type targetManager struct {
 	requestAllowance chan bool
 	poolsByJob       map[string]*TargetPool
 	results          chan<- *extraction.Result
+	globalLabels     clientmodel.LabelSet
 }
 
 func NewTargetManager(results chan<- *extraction.Result, requestAllowance int) TargetManager {
@@ -119,4 +122,12 @@ func (m *targetManager) AddTargetsFromConfig(config config.Config) {
 // XXX: Not really thread-safe. Only used in /status page for now.
 func (m *targetManager) Pools() map[string]*TargetPool {
 	return m.poolsByJob
+}
+
+func (m *targetManager) SetGlobalLabels(l clientmodel.LabelSet) {
+	m.globalLabels = l
+}
+
+func (m *targetManager) GlobalLabels() clientmodel.LabelSet {
+	return m.globalLabels
 }

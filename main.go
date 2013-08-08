@@ -190,6 +190,7 @@ func main() {
 
 	// Queue depth will need to be exposed
 	targetManager := retrieval.NewTargetManager(unwrittenSamples, *concurrentRetrievalAllowance)
+	targetManager.SetGlobalLabels(conf.GlobalLabels())
 	targetManager.AddTargetsFromConfig(conf)
 
 	notifications := make(chan notification.NotificationReqs, *notificationQueueCapacity)

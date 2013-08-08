@@ -48,6 +48,8 @@ func (t fakeTarget) GlobalAddress() string {
 	return t.Address()
 }
 
+func (t *fakeTarget) SetBaseLabels(l clientmodel.LabelSet) {}
+
 func (t fakeTarget) BaseLabels() clientmodel.LabelSet {
 	return clientmodel.LabelSet{}
 }

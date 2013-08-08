@@ -112,6 +112,8 @@ type Target interface {
 	// The address as seen from other hosts. References to localhost are resolved
 	// to the address of the prometheus server.
 	GlobalAddress() string
+	// Set the target's base labels.
+	SetBaseLabels(clientmodel.LabelSet)
 	// Return the target's base labels.
 	BaseLabels() clientmodel.LabelSet
 	// Merge a new externally supplied target definition (e.g. with changed base
@@ -310,6 +312,10 @@ func (t *target) GlobalAddress() string {
 		address = strings.Replace(address, localhostRepresentation, fmt.Sprintf("http://%s", hostname), -1)
 	}
 	return address
+}
+
+func (t *target) SetBaseLabels(l clientmodel.LabelSet) {
+	t.baseLabels = l
 }
 
 func (t *target) BaseLabels() clientmodel.LabelSet {
