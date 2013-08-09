@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"text/template"
 	"time"
 
 	clientmodel "github.com/prometheus/client_golang/model"
@@ -60,13 +61,37 @@ func NewNotificationHandler(alertmanagerUrl string, prometheusUrl string, notifi
 	}
 }
 
+// Interpolate alert information into summary/description templates.
+func interpolateMessage(msg string, alert *rules.Alert) string {
+	t := template.New("message")
+
+	// Inject some convenience variables that are easier to remember for users
+	// who are not used to Go's templating system.
+	defs :=
+		"{{$labels := .Labels}}" +
+			"{{$payload := .Payload}}" +
+			"{{$value := .Value}}"
+
+	if _, err := t.Parse(defs + msg); err != nil {
+		log.Println("Error parsing template:", err)
+		return msg
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, alert); err != nil {
+		log.Println("Error executing template:", err)
+		return msg
+	}
+	return buf.String()
+}
+
 // Send a list of notifications to the configured alert manager.
 func (n *NotificationHandler) sendNotifications(reqs rules.NotificationReqs) error {
 	alerts := make([]map[string]interface{}, 0, len(reqs))
 	for _, req := range reqs {
 		alerts = append(alerts, map[string]interface{}{
-			"Summary":     req.Rule.Summary,
-			"Description": req.Rule.Description,
+			"Summary":     interpolateMessage(req.Rule.Summary, &req.ActiveAlert),
+			"Description": interpolateMessage(req.Rule.Description, &req.ActiveAlert),
 			"Labels": req.ActiveAlert.Labels.Merge(clientmodel.LabelSet{
 				rules.AlertNameLabel: clientmodel.LabelValue(req.Rule.Name()),
 			}),
