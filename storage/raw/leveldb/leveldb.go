@@ -36,7 +36,7 @@ var (
 	}
 
 	iteratorOpts = &opt.ReadOptions{
-		Flag: opt.RFDontFillCache | opt.RFDontCopyBuffer,
+		Flag: opt.RFDontFillCache,
 	}
 )
 
@@ -63,7 +63,7 @@ type LevelDBOptions struct {
 
 func NewLevelDBPersistence(o LevelDBOptions) (*LevelDBPersistence, error) {
 	options := &opt.Options{
-		Comparer: new(comparer.BytesComparer),
+		Comparer: comparer.DefaultComparer,
 
 		Flag: opt.OFCreateIfMissing,
 
@@ -88,9 +88,7 @@ func NewLevelDBPersistence(o LevelDBOptions) (*LevelDBPersistence, error) {
 
 		storage: storage,
 
-		readOpts: &opt.ReadOptions{
-			Flag: opt.RFDontCopyBuffer,
-		},
+		readOpts: new(opt.ReadOptions),
 		writeOpts: &opt.WriteOptions{},
 	}, nil
 }
