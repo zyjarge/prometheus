@@ -224,18 +224,18 @@ func TestCompaction(t *testing.T) {
 		//			https://github.com/prometheus/prometheus/issues/368
 		//			Fix this!
 		//
-		//{
-		//	leveldbChunkSize: 5,
-		//	numTimeseries: 3,
-		//	samplesPerTs: 20,
+		{
+			leveldbChunkSize: 5,
+			numTimeseries: 3,
+			samplesPerTs: 20,
 
-		//	ignoreYoungerThan: time.Minute,
-		//	maximumMutationPoolBatch: 30,
-		//	minimumGroupSize: 10,
+			ignoreYoungerThan: time.Minute,
+			maximumMutationPoolBatch: 30,
+			minimumGroupSize: 10,
 
-		//	uncompactedChunks: 12,
-		//	compactedChunks: 9,
-		//},
+			uncompactedChunks: 12,
+			compactedChunks: 9,
+		},
 	}
 
 	for _, s := range scenarios {

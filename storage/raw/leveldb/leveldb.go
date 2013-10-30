@@ -142,7 +142,9 @@ func (i *levigoIterator) SeekToLast() bool {
 }
 
 func (i *levigoIterator) Next() bool {
+  fmt.Println("BEFORE NEXT", i.iterator.Key())
 	i.iterator.Next()
+  fmt.Println("AFTER NEXT ", i.iterator.Key())
 
 	i.valid = i.iterator.Valid()
 
@@ -150,7 +152,9 @@ func (i *levigoIterator) Next() bool {
 }
 
 func (i *levigoIterator) Previous() bool {
+  fmt.Println("BEFORE PREV", i.iterator.Key())
 	i.iterator.Prev()
+  fmt.Println("AFTER PREV ", i.iterator.Key())
 
 	i.valid = i.iterator.Valid()
 
