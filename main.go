@@ -27,6 +27,7 @@ import (
 
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/notification"
+	"github.com/prometheus/prometheus/tsdb"
 	"github.com/prometheus/prometheus/retrieval"
 	"github.com/prometheus/prometheus/rules"
 	"github.com/prometheus/prometheus/storage/metric"
@@ -42,6 +43,9 @@ var (
 	metricsStoragePath = flag.String("metricsStoragePath", "/tmp/metrics", "Base path for metrics storage.")
 
 	alertmanagerUrl = flag.String("alertmanager.url", "", "The URL of the alert manager to send notifications to.")
+
+	tsdbUrl           = flag.String("tsdb.url", "localhost:4242", "The URL of the OpenTSDB instance to send samples to.")
+	tsdbQueueCapacity = flag.Int("tsdb.queue.samplesCapacity", 4096, "The size of the queue for samples to be written to the remote timeseries database.")
 
 	samplesQueueCapacity      = flag.Int("storage.queue.samplesCapacity", 4096, "The size of the unwritten samples queue.")
 	diskAppendQueueCapacity   = flag.Int("storage.queue.diskAppendCapacity", 1000000, "The size of the queue for items that are pending writing to disk.")
@@ -361,9 +365,15 @@ func main() {
 	}()
 
 	// TODO(all): Migrate this into prometheus.serve().
+	openTSDB := tsdb.NewOpenTSDBClient(*tsdbUrl, time.Second)
+	tsdbQueue := tsdb.NewTSDBQueueManager(openTSDB, *tsdbQueueCapacity)
+	go tsdbQueue.Run()
+	defer tsdbQueue.Close()
+
 	for block := range unwrittenSamples {
-		if block.Err == nil {
+		if block.Err == nil && len(block.Samples) > 0 {
 			ts.AppendSamples(block.Samples)
+			tsdbQueue.Store(block.Samples)
 		}
 	}
 }
