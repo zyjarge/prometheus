@@ -11,27 +11,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: dumper pruner rule_checker dbbench
+MAKE_ARTIFACTS = dbbench
+
+all: dbbench
 
 SUFFIXES:
 
-include ../Makefile.INCLUDE
+include ../../Makefile.INCLUDE
 
-dumper:
-	$(MAKE) -C dumper
-
-pruner:
-	$(MAKE) -C pruner
-
-rule_checker:
-	$(MAKE) -C rule_checker
-
-dbbench:
-	$(MAKE) -C dbbench
+dbbench: $(shell find . -iname '*.go')
+	$(GO) build -o dbbench .
 
 clean:
-	$(MAKE) -C dumper clean
-	$(MAKE) -C pruner clean
-	$(MAKE) -C rule_checker clean
+	rm -rf $(MAKE_ARTIFACTS)
 
-.PHONY: clean dumper pruner rule_checker dbbench
+.PHONY: clean
