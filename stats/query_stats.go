@@ -27,6 +27,7 @@ const (
 	InnerViewBuildingTime
 	InnerEvalTime
 	ResultAppendTime
+	IteratorPreparationTime
 	QueryAnalysisTime
 	GetValueAtTimeTime
 	GetBoundaryValuesTime
@@ -57,6 +58,8 @@ func (s QueryTiming) String() string {
 		return "Inner eval time"
 	case ResultAppendTime:
 		return "Result append time"
+	case IteratorPreparationTime:
+		return "Iterator preparation time"
 	case QueryAnalysisTime:
 		return "Query analysis time"
 	case GetValueAtTimeTime:

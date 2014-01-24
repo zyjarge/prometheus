@@ -431,6 +431,7 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 			// If we aimed before the oldest value in memory, load more data from disk.
 			if (len(memValues) == 0 || memValues.FirstTimeAfter(targetTime)) && diskPresent {
 				if iterator == nil {
+					prepTimer := viewJob.stats.GetTimer(stats.ViewDiskPreparationTime).Start()
 					// Get a single iterator that will be used for all data extraction
 					// below.
 					iterator, _ = t.DiskStorage.MetricSamples.NewIterator(true)
@@ -452,6 +453,7 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 							firstBlock.Load(sampleKeyDto)
 						}
 					}
+					prepTimer.Stop()
 				}
 
 				if diskPresent {
