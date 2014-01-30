@@ -341,7 +341,7 @@ func (w *watermarkScanner) curationConsistent(f *clientmodel.Fingerprint, waterm
 func (w *watermarkScanner) Operate(key, _ interface{}) (oErr *storage.OperatorError) {
 	fingerprint := key.(*clientmodel.Fingerprint)
 
-	glog.Infof("Curating %s...", fingerprint)
+	//glog.Infof("Curating %s...", fingerprint)
 
 	if len(w.ViewQueue) > 0 {
 		glog.Warning("Deferred due to view queue.")

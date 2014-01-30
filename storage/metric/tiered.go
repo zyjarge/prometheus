@@ -406,6 +406,7 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 
 	extractionTimer := viewJob.stats.GetTimer(stats.ViewDataExtractionTime).Start()
 	for _, scanJob := range scans {
+		fmt.Println(scanJob.fingerprint)
 		old, err := t.seriesTooOld(scanJob.fingerprint, scanJob.operations[0].CurrentTime())
 		if err != nil {
 			glog.Errorf("Error getting watermark from cache for %s: %s", scanJob.fingerprint, err)
