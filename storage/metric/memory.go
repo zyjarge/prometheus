@@ -284,7 +284,9 @@ func (s *memorySeriesStorage) Flush(flushOlderThan clientmodel.Timestamp, queue 
 		// BUG(all): this can deadlock if the queue is full, as we only ever clear
 		// the queue after calling this method:
 		// https://github.com/prometheus/prometheus/issues/275
-		queue <- queued
+		if len(queued) > 0 {
+			queue <- queued
+		}
 
 		if stream.size() == 0 {
 			emptySeries = append(emptySeries, fingerprint)

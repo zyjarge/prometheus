@@ -45,6 +45,11 @@ func (t *Timer) String() string {
 	return fmt.Sprintf("%s: %s", t.name, t.duration)
 }
 
+// Return a string representation of the Timer.
+func (t *Timer) AvgString(n int) string {
+	return fmt.Sprintf("%s: %s", t.name, t.duration / time.Duration(n))
+}
+
 // A TimerGroup represents a group of timers relevant to a single query.
 type TimerGroup struct {
 	timers map[fmt.Stringer]*Timer
@@ -95,6 +100,20 @@ func (t *TimerGroup) String() string {
 	result := &bytes.Buffer{}
 	for _, timer := range timers.Timers {
 		fmt.Fprintf(result, "%s\n", timer)
+	}
+	return result.String()
+}
+
+// Return a string representation of a TimerGroup.
+func (t *TimerGroup) AvgString(n int) string {
+	timers := byCreationTimeSorter{}
+	for _, timer := range t.timers {
+		timers.Timers = append(timers.Timers, timer)
+	}
+	sort.Sort(timers)
+	result := &bytes.Buffer{}
+	for _, timer := range timers.Timers {
+		fmt.Fprintf(result, "%s\n", timer.AvgString(n))
 	}
 	return result.String()
 }

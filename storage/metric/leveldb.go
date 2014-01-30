@@ -281,6 +281,7 @@ func groupByFingerprint(samples clientmodel.Samples) map[clientmodel.Fingerprint
 	sortingSemaphore := make(chan bool, sortConcurrency)
 	doneSorting := sync.WaitGroup{}
 
+	return fingerprintToSamples
 	for _, samples := range fingerprintToSamples {
 		doneSorting.Add(1)
 
