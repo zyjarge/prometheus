@@ -101,4 +101,7 @@ update:
 web: config dependencies model preparation
 	$(MAKE) -C web
 
-.PHONY: advice binary build clean config dependencies documentation format model package preparation race_condition_binary race_condition_run run search_index tarball test tools update
+exec:
+	${RUN}
+
+.PHONY: advice binary build clean config dependencies documentation format model package preparation race_condition_binary race_condition_run run search_index tarball test tools update exec
