@@ -57,7 +57,7 @@ func appendSamples(storage *metric.TieredStorage, endTime time.Time) {
 	interval := time.Duration(*valueIntervalSeconds) * time.Second
 	startTime := endTime.Add(-interval * time.Duration(*numValuesPerTimeseries))
 	for ts := 0; ts < *numTimeseries; ts++ {
-		buildStart := time.Now()
+		//buildStart := time.Now()
 		metric := model.Metric{}
 
 		for i := 0; i < *numLabels; i++ {
@@ -75,27 +75,27 @@ func appendSamples(storage *metric.TieredStorage, endTime time.Time) {
 			})
 			x += 0.05
 		}
-		fmt.Println("Build:", time.Since(buildStart))
+		//fmt.Println("Build:", time.Since(buildStart))
 
-		appendStart := time.Now()
+		//appendStart := time.Now()
 		storage.AppendSamples(samples)
-		fmt.Println("Append:", time.Since(appendStart))
+		//fmt.Println("Append:", time.Since(appendStart))
 
 		if ts%1000 == 0 {
-			fmt.Println("At timeseries", ts)
+			//fmt.Println("At timeseries", ts)
 
-			flushStart := time.Now()
+			//flushStart := time.Now()
 			storage.Flush()
-			fmt.Println("Flush", time.Since(flushStart))
+			//fmt.Println("Flush", time.Since(flushStart))
 
-			gcStart := time.Now()
+			//gcStart := time.Now()
 			runtime.GC()
-			fmt.Println("GC", time.Since(gcStart))
+			//fmt.Println("GC", time.Since(gcStart))
 		}
 	}
-	fmt.Printf("Flushing...\n")
+	//fmt.Printf("Flushing...\n")
 	storage.Flush()
-	fmt.Printf("Finished flushing...\n")
+	//fmt.Printf("Finished flushing...\n")
 }
 
 func main() {

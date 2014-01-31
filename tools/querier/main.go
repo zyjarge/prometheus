@@ -31,7 +31,7 @@ import (
 var (
 	storageRoot      = flag.String("storage.root", "/tmp/metrics", "Base path for metrics storage.")
 	expression       = flag.String("expression", "up", "Expression language query to execute.")
-	numWarmupQueries = flag.Int("numWarmupQueries", 100, "How many times the provided query should be executed before measuring time.")
+	numWarmupQueries = flag.Int("numWarmupQueries", 10, "How many times the provided query should be executed before measuring time.")
 	numQueries       = flag.Int("numQueries", 100, "How many times the provided query should be repeated when measuring time.")
 	queryRange       = flag.Duration("range", time.Hour, "How long of a time range to run the query over.")
 	queryEnd         = flag.Int("end", int(time.Date(2014, 1, 1, 0, 0, 0, 0, time.UTC).Unix()), "The end of the query range, as a number of seconds since the epoch.")
