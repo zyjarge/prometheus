@@ -34,7 +34,7 @@ var (
 
 	groupSize = flag.Int("compact.groupSize", 5000, "The minimum group size for samples.")
 
-	instant = flag.Int("compact.instant", int(time.Date(2014, 1, 1, 0, 0, 0, 0, time.UTC).Unix()), "The relative inclusiveness of samples.")
+	instant          = flag.Int("compact.instant", int(time.Date(2014, 1, 1, 0, 0, 0, 0, time.UTC).Unix()), "The relative inclusiveness of samples.")
 	ageInclusiveness = flag.Duration("compact.ageInclusiveness", time.Minute, "The relative inclusiveness of samples.")
 
 	arenaFlushInterval = flag.Duration("arena.flushInterval", 15*time.Minute, "The period at which the in-memory arena is flushed to disk.")

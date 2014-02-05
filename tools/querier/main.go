@@ -85,9 +85,11 @@ func main() {
 	}
 
 	queryStats = stats.NewTimerGroup()
+	evalTimer := queryStats.GetTimer(stats.TotalEvalTime).Start()
 	for i := 0; i < *numQueries; i++ {
 		doQuery(queryStats, false)
 	}
+	evalTimer.Stop()
 
 	glog.Infof("Average query stats:\n%s\n%s", expr, queryStats.AvgString(*numQueries))
 }
