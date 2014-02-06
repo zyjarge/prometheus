@@ -9,7 +9,7 @@ STORAGE_ROOT="/srv/metrics_bench"
 function query {
   storage_root="${1}"
   expression="${2}"
-  tools/querier/querier -storage.root="${storage_root}" -alsologtostderr -range=48h -expression="${expression}" -expectedElements=1 -resolution=1m -numWarmupQueries=5 -numQueries=100 2>&1
+  tools/querier/querier -storage.root="${storage_root}" -alsologtostderr -range=48h -expression="${expression}" -expectedElements=1 -resolution=1m -numWarmupQueries=5 -numQueries=10 2>&1
 }
 
 function bench {
@@ -30,7 +30,7 @@ function bench {
   done
 }
 
-for i in 1 10 100; do
+for i in 1 10; do
   expression="$(for n in $(seq 1 $i); do echo -n "metric_${n} + "; done)"
   expression="${expression%???}"
   bench "${i}" "${expression}"
