@@ -53,6 +53,9 @@ func main() {
 	<-storageStarted
 
 	expr, err := rules.LoadExprFromString(*expression)
+	if err != nil {
+		glog.Fatal(err)
+	}
 	if expr.Type() != ast.VECTOR {
 		glog.Fatal("Expression does not evaluate to vector type")
 	}

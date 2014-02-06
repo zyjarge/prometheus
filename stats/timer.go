@@ -47,7 +47,7 @@ func (t *Timer) String() string {
 
 // Return a string representation of the Timer.
 func (t *Timer) AvgString(n int) string {
-	return fmt.Sprintf("%s: %s", t.name, t.duration/time.Duration(n))
+	return fmt.Sprintf("%s: %s %d", t.name, t.duration/time.Duration(n), t.duration/time.Duration(n)/time.Microsecond)
 }
 
 // A TimerGroup represents a group of timers relevant to a single query.
