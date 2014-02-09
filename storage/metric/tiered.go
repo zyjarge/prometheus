@@ -458,7 +458,7 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 
 				if diskPresent {
 					diskTimer := viewJob.stats.GetTimer(stats.ViewDiskExtractionTime).Start()
-					diskValues, expired := t.loadChunkAroundTime(iterator, scanJob.fingerprint, targetTime, firstBlock, lastBlock)
+					diskValues, expired := t.loadChunkAroundTime(iterator, scanJob.fingerprint, targetTime, firstBlock, lastBlock, viewJob.stats)
 					if expired {
 						diskPresent = false
 					}
@@ -544,7 +544,7 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 	return
 }
 
-func (t *TieredStorage) loadChunkAroundTime(iterator leveldb.Iterator, fingerprint *clientmodel.Fingerprint, ts clientmodel.Timestamp, firstBlock, lastBlock *SampleKey) (chunk Values, expired bool) {
+func (t *TieredStorage) loadChunkAroundTime(iterator leveldb.Iterator, fingerprint *clientmodel.Fingerprint, ts clientmodel.Timestamp, firstBlock, lastBlock *SampleKey, timers *stats.TimerGroup) (chunk Values, expired bool) {
 	if fingerprint.Less(firstBlock.Fingerprint) {
 		return nil, false
 	}
