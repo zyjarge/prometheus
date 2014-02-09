@@ -111,11 +111,6 @@ func (i *levigoIterator) Close() error {
 }
 
 func (i *levigoIterator) Seek(m proto.Message) bool {
-	start := time.Now()
-	defer func() {
-		fmt.Println("Seek", time.Since(start))
-	}()
-
 	buf, _ := buffers.Get()
 	defer buffers.Give(buf)
 
@@ -131,11 +126,6 @@ func (i *levigoIterator) Seek(m proto.Message) bool {
 }
 
 func (i *levigoIterator) SeekToFirst() bool {
-	start := time.Now()
-	defer func() {
-		fmt.Println("SeekToFirst", time.Since(start))
-	}()
-
 	i.iterator.SeekToFirst()
 
 	i.valid = i.iterator.Valid()
@@ -144,11 +134,6 @@ func (i *levigoIterator) SeekToFirst() bool {
 }
 
 func (i *levigoIterator) SeekToLast() bool {
-	start := time.Now()
-	defer func() {
-		fmt.Println("SeekToLast", time.Since(start))
-	}()
-
 	i.iterator.SeekToLast()
 
 	i.valid = i.iterator.Valid()
@@ -157,11 +142,6 @@ func (i *levigoIterator) SeekToLast() bool {
 }
 
 func (i *levigoIterator) Next() bool {
-	start := time.Now()
-	defer func() {
-		fmt.Println("Next", time.Since(start))
-	}()
-
 	i.iterator.Next()
 
 	i.valid = i.iterator.Valid()
@@ -170,11 +150,6 @@ func (i *levigoIterator) Next() bool {
 }
 
 func (i *levigoIterator) Previous() bool {
-	start := time.Now()
-	defer func() {
-		fmt.Println("Previous", time.Since(start))
-	}()
-
 	i.iterator.Prev()
 
 	i.valid = i.iterator.Valid()
@@ -183,20 +158,10 @@ func (i *levigoIterator) Previous() bool {
 }
 
 func (i *levigoIterator) rawKey() (key []byte) {
-	start := time.Now()
-	defer func() {
-		fmt.Println("rawKey", time.Since(start))
-	}()
-
 	return i.iterator.Key()
 }
 
 func (i *levigoIterator) rawValue() (value []byte) {
-	start := time.Now()
-	defer func() {
-		fmt.Println("rawValue", time.Since(start))
-	}()
-
 	return i.iterator.Value()
 }
 
@@ -205,11 +170,6 @@ func (i *levigoIterator) Error() (err error) {
 }
 
 func (i *levigoIterator) Key(m proto.Message) error {
-	start := time.Now()
-	defer func() {
-		fmt.Println("Key", time.Since(start))
-	}()
-
 	buf, _ := buffers.Get()
 	defer buffers.Give(buf)
 
@@ -219,11 +179,6 @@ func (i *levigoIterator) Key(m proto.Message) error {
 }
 
 func (i *levigoIterator) Value(m proto.Message) error {
-	start := time.Now()
-	defer func() {
-		fmt.Println("Value", time.Since(start))
-	}()
-
 	buf, _ := buffers.Get()
 	defer buffers.Give(buf)
 
