@@ -20,11 +20,14 @@ import (
 
 	clientmodel "github.com/prometheus/client_golang/model"
 
+	"github.com/prometheus/prometheus/stats"
 	"github.com/prometheus/prometheus/storage/raw"
 	"github.com/prometheus/prometheus/storage/raw/leveldb"
 
 	dto "github.com/prometheus/prometheus/model/generated"
 )
+
+var dummyTimer = stats.NewTimerGroup().GetTimer(stats.TotalEvalTime)
 
 // processor models a post-processing agent that performs work given a sample
 // corpus.
@@ -109,7 +112,7 @@ func (p *CompactionProcessor) Apply(sampleIterator leveldb.Iterator, samplesPers
 
 	sampleKey.Load(sampleKeyDto)
 
-	unactedSamples, err = extractSampleValues(sampleIterator)
+	unactedSamples, err = extractSampleValues(sampleIterator, dummyTimer, dummyTimer)
 	if err != nil {
 		return
 	}
@@ -138,7 +141,7 @@ func (p *CompactionProcessor) Apply(sampleIterator leveldb.Iterator, samplesPers
 				break
 			}
 
-			unactedSamples, err = extractSampleValues(sampleIterator)
+			unactedSamples, err = extractSampleValues(sampleIterator, dummyTimer, dummyTimer)
 			if err != nil {
 				return
 			}
@@ -329,7 +332,7 @@ func (p *DeletionProcessor) Apply(sampleIterator leveldb.Iterator, samplesPersis
 	}
 	sampleKey.Load(sampleKeyDto)
 
-	sampleValues, err := extractSampleValues(sampleIterator)
+	sampleValues, err := extractSampleValues(sampleIterator, dummyTimer, dummyTimer)
 	if err != nil {
 		return
 	}
@@ -355,7 +358,7 @@ func (p *DeletionProcessor) Apply(sampleIterator leveldb.Iterator, samplesPersis
 			}
 			sampleKey.Load(sampleKeyDto)
 
-			sampleValues, err = extractSampleValues(sampleIterator)
+			sampleValues, err = extractSampleValues(sampleIterator, dummyTimer, dummyTimer)
 			if err != nil {
 				return
 			}

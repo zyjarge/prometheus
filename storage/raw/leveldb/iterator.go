@@ -15,6 +15,8 @@ package leveldb
 
 import (
 	"code.google.com/p/goprotobuf/proto"
+
+	"github.com/prometheus/prometheus/stats"
 )
 
 // TODO: Evaluate whether to use coding.Encoder for the key and values instead
@@ -33,6 +35,7 @@ type Iterator interface {
 
 	Key(proto.Message) error
 	Value(proto.Message) error
+	ValueTimed(proto.Message, *stats.Timer, *stats.Timer) error
 
 	Close() error
 

@@ -545,6 +545,10 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 }
 
 func (t *TieredStorage) loadChunkAroundTime(iterator leveldb.Iterator, fingerprint *clientmodel.Fingerprint, ts clientmodel.Timestamp, firstBlock, lastBlock *SampleKey, timers *stats.TimerGroup) (chunk Values, expired bool) {
+	loadValueTimer := timers.GetTimer(stats.ViewDiskLoadValueTime)
+	decodeValueTimer := timers.GetTimer(stats.ViewDiskDecodeValueTime)
+	seekTimer := timers.GetTimer(stats.ViewDiskSeekTime)
+
 	if fingerprint.Less(firstBlock.Fingerprint) {
 		return nil, false
 	}
@@ -569,9 +573,12 @@ func (t *TieredStorage) loadChunkAroundTime(iterator leveldb.Iterator, fingerpri
 	defer t.dtoSampleKeys.Give(dto)
 
 	seekingKey.Dump(dto)
+	seekTimer.Start()
 	if !iterator.Seek(dto) {
+		seekTimer.Stop()
 		return chunk, true
 	}
+	seekTimer.Stop()
 
 	var foundValues Values
 
@@ -593,11 +600,13 @@ func (t *TieredStorage) loadChunkAroundTime(iterator leveldb.Iterator, fingerpri
 		//
 		// Only do the rewind if there is another chunk before this one.
 		if !seekingKey.MayContain(ts) {
-			postValues, _ := extractSampleValues(iterator)
+			postValues, _ := extractSampleValues(iterator, loadValueTimer, decodeValueTimer)
 			if !seekingKey.Equal(firstBlock) {
+				seekTimer.Start()
 				if !iterator.Previous() {
 					panic("This should never return false.")
 				}
+				seekTimer.Stop()
 
 				if err := iterator.Key(dto); err != nil {
 					panic(err)
@@ -608,21 +617,23 @@ func (t *TieredStorage) loadChunkAroundTime(iterator leveldb.Iterator, fingerpri
 					return postValues, false
 				}
 
-				foundValues, _ = extractSampleValues(iterator)
+				foundValues, _ = extractSampleValues(iterator, loadValueTimer, decodeValueTimer)
 				foundValues = append(foundValues, postValues...)
 				return foundValues, false
 			}
 		}
 
-		foundValues, _ = extractSampleValues(iterator)
+		foundValues, _ = extractSampleValues(iterator, loadValueTimer, decodeValueTimer)
 		return foundValues, false
 	}
 
 	if fingerprint.Less(seekingKey.Fingerprint) {
 		if !seekingKey.Equal(firstBlock) {
+			seekTimer.Start()
 			if !iterator.Previous() {
 				panic("This should never return false.")
 			}
+			seekTimer.Stop()
 
 			if err := iterator.Key(dto); err != nil {
 				panic(err)
@@ -633,7 +644,7 @@ func (t *TieredStorage) loadChunkAroundTime(iterator leveldb.Iterator, fingerpri
 				return nil, false
 			}
 
-			foundValues, _ = extractSampleValues(iterator)
+			foundValues, _ = extractSampleValues(iterator, loadValueTimer, decodeValueTimer)
 			return foundValues, false
 		}
 	}

@@ -20,6 +20,7 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 	"github.com/jmhodges/levigo"
 
+	"github.com/prometheus/prometheus/stats"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/storage/raw"
 )
@@ -184,6 +185,19 @@ func (i *levigoIterator) Value(m proto.Message) error {
 
 	buf.SetBuf(i.iterator.Value())
 
+	return buf.Unmarshal(m)
+}
+
+func (i *levigoIterator) ValueTimed(m proto.Message, loadTimer, decodeTimer *stats.Timer) error {
+	buf, _ := buffers.Get()
+	defer buffers.Give(buf)
+
+	loadTimer.Start()
+	buf.SetBuf(i.iterator.Value())
+	loadTimer.Stop()
+
+	decodeTimer.Start()
+	defer decodeTimer.Stop()
 	return buf.Unmarshal(m)
 }
 

@@ -37,6 +37,10 @@ const (
 	ViewScanJobsTime
 	ViewDataExtractionTime
 	ViewDiskExtractionTime
+
+	ViewDiskLoadValueTime
+	ViewDiskDecodeValueTime
+	ViewDiskSeekTime
 )
 
 // Return a string represenation of a QueryTiming identifier.
@@ -78,6 +82,12 @@ func (s QueryTiming) String() string {
 		return "Total view data extraction time"
 	case ViewDiskExtractionTime:
 		return "View disk data extraction time"
+	case ViewDiskLoadValueTime:
+		return "View disk value loading time"
+	case ViewDiskDecodeValueTime:
+		return "View disk value decoding time"
+	case ViewDiskSeekTime:
+		return "View disk seek time"
 	default:
 		return "Unknown query timing"
 	}

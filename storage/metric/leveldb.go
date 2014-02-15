@@ -25,6 +25,7 @@ import (
 
 	clientmodel "github.com/prometheus/client_golang/model"
 
+	"github.com/prometheus/prometheus/stats"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/storage/raw"
 	"github.com/prometheus/prometheus/storage/raw/leveldb"
@@ -416,12 +417,14 @@ func extractSampleKey(i leveldb.Iterator) (*SampleKey, error) {
 	return key, nil
 }
 
-func extractSampleValues(i leveldb.Iterator) (Values, error) {
+func extractSampleValues(i leveldb.Iterator, loadTimer *stats.Timer, decodeTimer *stats.Timer) (Values, error) {
 	v := &dto.SampleValueSeries{}
-	if err := i.Value(v); err != nil {
+	if err := i.ValueTimed(v, loadTimer, decodeTimer); err != nil {
 		return nil, err
 	}
 
+	decodeTimer.Start()
+	defer decodeTimer.Stop()
 	return NewValuesFromDTO(v), nil
 }
 
