@@ -24,9 +24,16 @@ import (
 	"github.com/prometheus/prometheus/storage/metric"
 )
 
+// FullRangeMap maps the fingerprint of a full range to the duration
+// of the matrix literal it resulted from.
 type FullRangeMap map[clientmodel.Fingerprint]time.Duration
+
+// IntervalRangeMap is a set of fingerprints of interval ranges.
 type IntervalRangeMap map[clientmodel.Fingerprint]bool
 
+// A QueryAnalyzer recursively traverses the AST to look for any nodes
+// which will need data from the datastore. Instantiate with
+// NewQueryAnalyzer.
 type QueryAnalyzer struct {
 	// Values collected by query analysis.
 	//
@@ -37,13 +44,16 @@ type QueryAnalyzer struct {
 	// This is because full ranges can only result from matrix literals (like
 	// "foo[5m]"), which have said time-spanning behavior during a ranged query.
 	FullRanges FullRangeMap
-	// Interval ranges always implicitly span the whole query interval.
+	// Interval ranges always implicitly span the whole query range.
 	IntervalRanges IntervalRangeMap
 	// The underlying storage to which the query will be applied. Needed for
 	// extracting timeseries fingerprint information during query analysis.
 	storage *metric.TieredStorage
 }
 
+// NewQueryAnalyzer returns a pointer to a newly instantiated
+// QueryAnalyzer. The storage is needed to extract timeseries
+// fingerprint information during query analysis.
 func NewQueryAnalyzer(storage *metric.TieredStorage) *QueryAnalyzer {
 	return &QueryAnalyzer{
 		FullRanges:     FullRangeMap{},
@@ -52,6 +62,7 @@ func NewQueryAnalyzer(storage *metric.TieredStorage) *QueryAnalyzer {
 	}
 }
 
+// Visit implements the Visitor interface.
 func (analyzer *QueryAnalyzer) Visit(node Node) {
 	switch n := node.(type) {
 	case *VectorLiteral:
@@ -62,7 +73,11 @@ func (analyzer *QueryAnalyzer) Visit(node Node) {
 		}
 		n.fingerprints = fingerprints
 		for _, fingerprint := range fingerprints {
-			analyzer.IntervalRanges[*fingerprint] = true
+			// Only add the fingerprint to IntervalRanges if not yet present in FullRanges.
+			// Full ranges always contain more points and span more time than interval ranges.
+			if _, alreadyInFullRanges := analyzer.FullRanges[*fingerprint]; !alreadyInFullRanges {
+				analyzer.IntervalRanges[*fingerprint] = true
+			}
 		}
 	case *MatrixLiteral:
 		fingerprints, err := analyzer.storage.GetFingerprintsForLabelSet(n.labels)
@@ -74,19 +89,19 @@ func (analyzer *QueryAnalyzer) Visit(node Node) {
 		for _, fingerprint := range fingerprints {
 			if analyzer.FullRanges[*fingerprint] < n.interval {
 				analyzer.FullRanges[*fingerprint] = n.interval
+				// Delete the fingerprint from IntervalRanges. Full ranges always contain
+				// more points and span more time than interval ranges, so we don't need
+				// an interval range for the same fingerprint, should we have one.
+				delete(analyzer.IntervalRanges, *fingerprint)
 			}
 		}
 	}
 }
 
+// AnalyzeQueries walks the AST, starting at node, calling Visit on
+// each node to collect fingerprints.
 func (analyzer *QueryAnalyzer) AnalyzeQueries(node Node) {
 	Walk(analyzer, node)
-	// Find and dedupe overlaps between full and stepped ranges. Full ranges
-	// always contain more points *and* span more time than stepped ranges, so
-	// throw away stepped ranges for fingerprints which have full ranges.
-	for fingerprint := range analyzer.FullRanges {
-		delete(analyzer.IntervalRanges, fingerprint)
-	}
 }
 
 func viewAdapterForInstantQuery(node Node, timestamp clientmodel.Timestamp, storage *metric.TieredStorage, queryStats *stats.TimerGroup) (*viewAdapter, error) {
