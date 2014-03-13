@@ -21,11 +21,12 @@ package main
 import (
 	"encoding/csv"
 	"flag"
-	"fmt"
+	//"fmt"
 	"os"
-	"strconv"
+	//"strconv"
 
 	"github.com/golang/glog"
+	idb "github.com/influxdb/influxdb-go"
 	clientmodel "github.com/prometheus/client_golang/model"
 
 	"github.com/prometheus/prometheus/storage"
@@ -39,9 +40,12 @@ var (
 
 type SamplesDumper struct {
 	*csv.Writer
+	influxdb           *idb.Client
 	storage            metric.MetricPersistence
 	currentFingerprint *clientmodel.Fingerprint
 	currentMetric      clientmodel.Metric
+	columns            []string
+	values             []interface{}
 }
 
 func (d *SamplesDumper) Operate(key, value interface{}) *storage.OperatorError {
@@ -53,30 +57,55 @@ func (d *SamplesDumper) Operate(key, value interface{}) *storage.OperatorError {
 		} else {
 			d.currentMetric = metric
 		}
+		d.columns = make([]string, 0, len(d.currentMetric)+1)
+		d.values = make([]interface{}, 0, len(d.currentMetric)+1)
+		for col, val := range d.currentMetric {
+			if col != clientmodel.MetricNameLabel {
+				d.columns = append(d.columns, string(col))
+				d.values = append(d.values, string(val))
+			}
+		}
+		d.columns = append(d.columns, []string{"time", "value"}...)
+		d.values = append(d.values, []interface{}{0, 0}...)
 	}
 	if *dieOnBadChunk && sampleKey.FirstTimestamp.After(sampleKey.LastTimestamp) {
 		glog.Fatalf("Chunk: First time (%v) after last time (%v): %v\n", sampleKey.FirstTimestamp.Unix(), sampleKey.LastTimestamp.Unix(), sampleKey)
 	}
-	for i, sample := range value.(metric.Values) {
+	for _, sample := range value.(metric.Values) {
 		if *dieOnBadChunk && (sample.Timestamp.Before(sampleKey.FirstTimestamp) || sample.Timestamp.After(sampleKey.LastTimestamp)) {
 			glog.Fatalf("Sample not within chunk boundaries: chunk FirstTimestamp (%v), chunk LastTimestamp (%v) vs. sample Timestamp (%v)\n", sampleKey.FirstTimestamp.Unix(), sampleKey.LastTimestamp.Unix(), sample.Timestamp)
 		}
-		d.Write([]string{
-			d.currentMetric.String(),
-			sampleKey.Fingerprint.String(),
-			strconv.FormatInt(sampleKey.FirstTimestamp.Unix(), 10),
-			strconv.FormatInt(sampleKey.LastTimestamp.Unix(), 10),
-			strconv.FormatUint(uint64(sampleKey.SampleCount), 10),
-			strconv.Itoa(i),
-			strconv.FormatInt(sample.Timestamp.Unix(), 10),
-			fmt.Sprintf("%v", sample.Value),
-		})
-		if err := d.Error(); err != nil {
-			return &storage.OperatorError{
-				Error:       err,
-				Continuable: false,
-			}
+
+		d.values[len(d.values)-2] = sample.Timestamp.Unix()
+		d.values[len(d.values)-1] = float64(sample.Value)
+
+		series := idb.Series{
+			Name:    string(d.currentMetric[clientmodel.MetricNameLabel]),
+			Columns: d.columns,
+			Points:  [][]interface{}{d.values},
 		}
+		glog.Info(series)
+		if err := d.influxdb.WriteSeries([]*idb.Series{&series}); err != nil {
+			glog.Fatal("error writing to InfluxDB:", err)
+		}
+		/*
+			d.Write([]string{
+				d.currentMetric.String(),
+				sampleKey.Fingerprint.String(),
+				strconv.FormatInt(sampleKey.FirstTimestamp.Unix(), 10),
+				strconv.FormatInt(sampleKey.LastTimestamp.Unix(), 10),
+				strconv.FormatUint(uint64(sampleKey.SampleCount), 10),
+				strconv.Itoa(i),
+				strconv.FormatInt(sample.Timestamp.Unix(), 10),
+				fmt.Sprintf("%v", sample.Value),
+			})
+			if err := d.Error(); err != nil {
+				return &storage.OperatorError{
+					Error:       err,
+					Continuable: false,
+				}
+			}
+		*/
 	}
 	return nil
 }
@@ -95,8 +124,9 @@ func main() {
 	defer persistence.Close()
 
 	dumper := &SamplesDumper{
-		Writer:  csv.NewWriter(os.Stdout),
-		storage: persistence,
+		Writer:   csv.NewWriter(os.Stdout),
+		influxdb: newInfluxDB(),
+		storage:  persistence,
 	}
 
 	entire, err := persistence.MetricSamples.ForEach(&metric.MetricSamplesDecoder{}, &metric.AcceptAllFilter{}, dumper)
