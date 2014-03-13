@@ -26,6 +26,7 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	clientmodel "github.com/prometheus/client_golang/model"
 
 	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/storage/metric"
@@ -38,10 +39,21 @@ var (
 
 type SamplesDumper struct {
 	*csv.Writer
+	storage            metric.MetricPersistence
+	currentFingerprint *clientmodel.Fingerprint
+	currentMetric      clientmodel.Metric
 }
 
 func (d *SamplesDumper) Operate(key, value interface{}) *storage.OperatorError {
 	sampleKey := key.(*metric.SampleKey)
+	if d.currentFingerprint == nil || !sampleKey.Fingerprint.Equal(d.currentFingerprint) {
+		d.currentFingerprint = sampleKey.Fingerprint
+		if metric, err := d.storage.GetMetricForFingerprint(d.currentFingerprint); err != nil {
+			glog.Fatalf("error getting metric for fingerprint %s: %s", sampleKey.Fingerprint, err)
+		} else {
+			d.currentMetric = metric
+		}
+	}
 	if *dieOnBadChunk && sampleKey.FirstTimestamp.After(sampleKey.LastTimestamp) {
 		glog.Fatalf("Chunk: First time (%v) after last time (%v): %v\n", sampleKey.FirstTimestamp.Unix(), sampleKey.LastTimestamp.Unix(), sampleKey)
 	}
@@ -50,6 +62,7 @@ func (d *SamplesDumper) Operate(key, value interface{}) *storage.OperatorError {
 			glog.Fatalf("Sample not within chunk boundaries: chunk FirstTimestamp (%v), chunk LastTimestamp (%v) vs. sample Timestamp (%v)\n", sampleKey.FirstTimestamp.Unix(), sampleKey.LastTimestamp.Unix(), sample.Timestamp)
 		}
 		d.Write([]string{
+			d.currentMetric.String(),
 			sampleKey.Fingerprint.String(),
 			strconv.FormatInt(sampleKey.FirstTimestamp.Unix(), 10),
 			strconv.FormatInt(sampleKey.LastTimestamp.Unix(), 10),
@@ -82,7 +95,8 @@ func main() {
 	defer persistence.Close()
 
 	dumper := &SamplesDumper{
-		csv.NewWriter(os.Stdout),
+		Writer:  csv.NewWriter(os.Stdout),
+		storage: persistence,
 	}
 
 	entire, err := persistence.MetricSamples.ForEach(&metric.MetricSamplesDecoder{}, &metric.AcceptAllFilter{}, dumper)
