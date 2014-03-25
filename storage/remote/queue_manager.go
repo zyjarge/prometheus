@@ -35,6 +35,11 @@ const (
 // external timeseries database (TSDB).
 type TSDBClient interface {
 	Store(clientmodel.Samples) error
+	Retrieve(
+		fp *clientmodel.Fingerprint,
+		startTime clientmodel.Timestamp,
+		endTime clientmodel.Timestamp,
+	) (clientmodel.Samples, error)
 }
 
 // TSDBQueueManager manages a queue of samples to be sent to the TSDB indicated

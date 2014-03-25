@@ -14,6 +14,7 @@ import (
 	"github.com/golang/glog"
 	clientmodel "github.com/prometheus/client_golang/model"
 
+	"github.com/prometheus/prometheus/storage/metric"
 	"github.com/prometheus/prometheus/utility"
 )
 
@@ -119,4 +120,15 @@ func (c *Client) Store(samples clientmodel.Samples) error {
 		return err
 	}
 	return fmt.Errorf("failed to write %d samples to OpenTSDB, %d succeeded", r["failed"], r["success"])
+}
+
+// Retrieve retrieves all samples of a time series within the given time
+// interval from OpenTSDB via its HTTP API.
+func (c *Client) Retrieve(
+	fp *clientmodel.Fingerprint,
+	startTime clientmodel.Timestamp,
+	endTime clientmodel.Timestamp,
+) (metric.Values, error) {
+	// TODO
+	return metric.Values{}, nil
 }

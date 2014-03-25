@@ -27,6 +27,7 @@ import (
 
 	"github.com/prometheus/prometheus/stats"
 	"github.com/prometheus/prometheus/storage/raw/leveldb"
+	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/prometheus/prometheus/utility"
 )
 
@@ -97,6 +98,8 @@ type TieredStorage struct {
 
 	dtoSampleKeys *dtoSampleKeyList
 	sampleKeys    *sampleKeyList
+
+	tsdb remote.TSDBClient
 }
 
 // viewJob encapsulates a request to extract sample values from the datastore.
@@ -440,6 +443,7 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 		}
 
 		memValues := t.memoryArena.CloneSamples(fp)
+		tsdbQueried := false
 
 		for !op.Consumed() {
 			// Abort the view rendering if the caller (MakeView) has timed out.
@@ -508,6 +512,33 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 				}
 			} else {
 				currentChunk = chunk(memValues)
+			}
+
+			if !tsdbQueried && t.tsdb != nil {
+				// Prepend values from the TSDB if required and possible.
+				tsdbQueried = true
+				endTime := clientmodel.TimestampFromTime(time.Now())
+				if diskPresent {
+					endTime = firstBlock.FirstTimestamp
+				} else if len(currentChunk) > 0 {
+					endTime = currentChunk[0].Timestamp
+				}
+				if targetTime.Before(endTime) {
+					samples, err := t.tsdb.Retrieve(fp, targetTime, endTime)
+					if err != nil {
+						glog.Warningf("retrieving values from TSDB failed: %s", err)
+					} else {
+						// TODO(bjoern): Move SamplePair / Values to clientmodel to make this easier.
+						tsdbChunk := make(chunk, 0, len(samples)+len(currentChunk))
+						for i, sample := range samples {
+							tsdbChunk[i] = SamplePair{
+								Timestamp: sample.Timestamp,
+								Value:     sample.Value,
+							}
+						}
+						currentChunk = append(tsdbChunk, currentChunk...)
+					}
+				}
 			}
 
 			// There's no data at all for this fingerprint, so stop processing.
