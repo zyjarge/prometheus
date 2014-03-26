@@ -43,10 +43,10 @@ func TestTagsFromMetric(t *testing.T) {
 
 func TestMarshalStoreSamplesRequest(t *testing.T) {
 	request := StoreSamplesRequest{
-		Metric:    TagValue("test:metric"),
-		Timestamp: 4711,
-		Value:     3.1415,
-		Tags:      tagsFromMetric(metric),
+		MetricName: TagValue("test:metric"),
+		Timestamp:  4711,
+		Value:      3.1415,
+		Tags:       tagsFromMetric(metric),
 	}
 	expectedJSON := []byte(`{"metric":"test_.metric","timestamp":4711,"value":3.1415,"tags":{"many_chars":"abc_21ABC_.012-3_2145_C3_B667_7E89./","testlabel":"test_.value"}}`)
 

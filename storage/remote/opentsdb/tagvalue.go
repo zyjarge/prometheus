@@ -2,6 +2,7 @@ package opentsdb
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 
 	clientmodel "github.com/prometheus/client_golang/model"
@@ -140,5 +141,53 @@ func (tv *TagValue) UnmarshalJSON(json []byte) error {
 		}
 	}
 	*tv = TagValue(result.String())
+	return nil
+}
+
+// TagValueToStringMap maps TagValues to strings. It is required as a named type
+// to ensure proper JSON encoding. (Normal maps must have plain strings as keys
+// to be (un-) marshable by the JSON library.)
+type TagValueToStringMap map[TagValue]string
+
+func (m TagValueToStringMap) MarshalJSON() ([]byte, error) {
+	var result bytes.Buffer
+	result.WriteByte('{')
+	for tv, str := range m {
+		if result.Len() > 1 {
+			result.WriteByte(',')
+		}
+		tvJSON, err := tv.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		result.Write(tvJSON)
+		result.WriteByte(':')
+		strJSON, err := json.Marshal(str)
+		if err != nil {
+			return nil, err
+		}
+		result.Write(strJSON)
+	}
+	result.WriteByte('}')
+	return result.Bytes(), nil
+}
+
+func (m *TagValueToStringMap) UnmarshalJSON(j []byte) error {
+	// To not reimplement the whole shebang to unmarshal maps, first
+	// unmarshal the TagValueToStringMap as a normal string map.
+	var stringMap map[string]string
+	if err := json.Unmarshal(j, &stringMap); err != nil {
+		return err
+	}
+	*m = TagValueToStringMap{}
+	for k, v := range stringMap {
+		// Piggyback on the TagValue Unmarshal method. To do that, we have to
+		// add the just removed quotes. :-(
+		var tv TagValue
+		if err := tv.UnmarshalJSON([]byte(fmt.Sprintf(`"%s"`, k))); err != nil {
+			return err
+		}
+		(*m)[tv] = v
+	}
 	return nil
 }

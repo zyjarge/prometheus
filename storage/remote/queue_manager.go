@@ -36,7 +36,7 @@ const (
 type TSDBClient interface {
 	Store(clientmodel.Samples) error
 	Retrieve(
-		fp *clientmodel.Fingerprint,
+		metric clientmodel.Metric,
 		startTime clientmodel.Timestamp,
 		endTime clientmodel.Timestamp,
 	) (clientmodel.Samples, error)

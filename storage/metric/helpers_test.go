@@ -89,7 +89,7 @@ func (t *testTieredStorageCloser) Close() {
 
 func NewTestTieredStorage(t test.Tester) (*TieredStorage, test.Closer) {
 	directory := test.NewTemporaryDirectory("test_tiered_storage", t)
-	storage, err := NewTieredStorage(2500, 1000, 5*time.Second, 0, directory.Path())
+	storage, err := NewTieredStorage(2500, 1000, 5*time.Second, 0, directory.Path(), nil)
 
 	if err != nil {
 		if storage != nil {

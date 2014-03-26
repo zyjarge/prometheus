@@ -46,6 +46,14 @@ func (c *TestTSDBClient) Store(s clientmodel.Samples) error {
 	return nil
 }
 
+func (c *TestTSDBClient) Retrieve(
+	fp *clientmodel.Fingerprint,
+	startTime clientmodel.Timestamp,
+	endTime clientmodel.Timestamp,
+) (clientmodel.Samples, error) {
+	return nil, nil
+}
+
 func TestSampleDelivery(t *testing.T) {
 	// Let's create an even number of send batches so we don't run into the
 	// batch timeout case.

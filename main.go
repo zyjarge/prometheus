@@ -201,18 +201,26 @@ func main() {
 		glog.Fatalf("Error loading configuration from %s: %v", *configFile, err)
 	}
 
-	ts, err := metric.NewTieredStorage(uint(*diskAppendQueueCapacity), 100, *arenaFlushInterval, *arenaTTL, *metricsStoragePath)
-	if err != nil {
-		glog.Fatal("Error opening storage: ", err)
-	}
-
-	var remoteTSDBQueue *remote.TSDBQueueManager = nil
+	var remoteTSDBQueue *remote.TSDBQueueManager
+	var openTSDB remote.TSDBClient
 	if *remoteTSDBUrl == "" {
 		glog.Warningf("No TSDB URL provided; not sending any samples to long-term storage")
 	} else {
-		openTSDB := opentsdb.NewClient(*remoteTSDBUrl, *remoteTSDBTimeout)
+		openTSDB = opentsdb.NewClient(*remoteTSDBUrl, *remoteTSDBTimeout)
 		remoteTSDBQueue = remote.NewTSDBQueueManager(openTSDB, 512)
 		go remoteTSDBQueue.Run()
+	}
+
+	ts, err := metric.NewTieredStorage(
+		uint(*diskAppendQueueCapacity),
+		100,
+		*arenaFlushInterval,
+		*arenaTTL,
+		*metricsStoragePath,
+		openTSDB,
+	)
+	if err != nil {
+		glog.Fatal("Error opening storage: ", err)
 	}
 
 	unwrittenSamples := make(chan *extraction.Result, *samplesQueueCapacity)

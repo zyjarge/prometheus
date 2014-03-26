@@ -117,13 +117,15 @@ const (
 
 const watermarkCacheLimit = 1024 * 1024
 
-// NewTieredStorage returns a TieredStorage object ready to use.
+// NewTieredStorage returns a TieredStorage object ready to use. tsdb may be nil
+// if you do not want to read from a remode tsdb at all.
 func NewTieredStorage(
 	appendToDiskQueueDepth,
 	viewQueueDepth uint,
 	flushMemoryInterval time.Duration,
 	memoryTTL time.Duration,
 	rootDirectory string,
+	tsdb remote.TSDBClient,
 ) (*TieredStorage, error) {
 	if isDir, _ := utility.IsDir(rootDirectory); !isDir {
 		if err := os.MkdirAll(rootDirectory, 0755); err != nil {
@@ -161,6 +163,7 @@ func NewTieredStorage(
 
 		dtoSampleKeys: newDtoSampleKeyList(10),
 		sampleKeys:    newSampleKeyList(10),
+		tsdb:          tsdb,
 	}
 
 	for i := 0; i < tieredMemorySemaphores; i++ {
@@ -390,6 +393,8 @@ func (t *TieredStorage) seriesTooOld(f *clientmodel.Fingerprint, i clientmodel.T
 }
 
 func (t *TieredStorage) renderView(viewJob viewJob) {
+	// TODO: This method is faaaar too long and convoluted.
+
 	// Telemetry.
 	var err error
 	begin := time.Now()
@@ -516,6 +521,10 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 
 			if !tsdbQueried && t.tsdb != nil {
 				// Prepend values from the TSDB if required and possible.
+				// TODO(bjoern): Following the current tiered storage model, we do retrieve
+				// all values in the given time range from the TSDB, possibly to discard
+				// most of them soon after. A TSDB (like OpenTSDB) might have downsampling
+				// features we could make use of for better performance.
 				tsdbQueried = true
 				endTime := clientmodel.TimestampFromTime(time.Now())
 				if diskPresent {
@@ -524,19 +533,27 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 					endTime = currentChunk[0].Timestamp
 				}
 				if targetTime.Before(endTime) {
-					samples, err := t.tsdb.Retrieve(fp, targetTime, endTime)
+					metric, err := t.GetMetricForFingerprint(fp)
 					if err != nil {
-						glog.Warningf("retrieving values from TSDB failed: %s", err)
+						glog.Warningf("cannot find metric for fingerprint %v: %s", fp, err)
 					} else {
-						// TODO(bjoern): Move SamplePair / Values to clientmodel to make this easier.
-						tsdbChunk := make(chunk, 0, len(samples)+len(currentChunk))
-						for i, sample := range samples {
-							tsdbChunk[i] = SamplePair{
-								Timestamp: sample.Timestamp,
-								Value:     sample.Value,
+						samples, err := t.tsdb.Retrieve(metric, targetTime, endTime)
+						if err != nil {
+							glog.Warningf("retrieving values from TSDB failed: %s", err)
+						} else {
+							// TODO(bjoern): tsdb.Retrieve should return Values directly,
+							// but that needs some more changes to not introduce
+							// circular import chains. For now, we go with the following,
+							// quite complicted and wasteful code...
+							tsdbChunk := make(chunk, 0, len(samples)+len(currentChunk))
+							for i, sample := range samples {
+								tsdbChunk[i] = SamplePair{
+									Timestamp: sample.Timestamp,
+									Value:     sample.Value,
+								}
 							}
+							currentChunk = append(tsdbChunk, currentChunk...)
 						}
-						currentChunk = append(tsdbChunk, currentChunk...)
 					}
 				}
 			}
