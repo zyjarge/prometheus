@@ -77,6 +77,10 @@ type AssignRequest struct {
 	TagValues   []TagValue `json:"tagv"`
 }
 
+func MakeAssignRequest() AssignRequest {
+	return AssignRequest{MetricNames: []TagValue{}, TagKeys: []string{}, TagValues: []TagValue{}}
+}
+
 // AssignResponse represents the JSON repsonse sent by OpenTSDB to tell us about
 // UIDs.
 type AssignResponse struct {
@@ -180,7 +184,7 @@ func (c *Client) Retrieve(
 	if err != nil {
 		return nil, err
 	}
-	params.Add("tsuid", tsuid)
+	params.Add("tsuid", "sum:"+tsuid)
 	params.Add("start", fmt.Sprint(startTime))
 	params.Add("end", fmt.Sprint(endTime))
 	u.RawQuery = params.Encode()
@@ -235,7 +239,7 @@ func (c *Client) Retrieve(
 
 func (c *Client) getTSUID(m clientmodel.Metric) (string, error) {
 	// Gather the metric names, tag keys, and tag values for which no UID is cached.
-	req := AssignRequest{}
+	req := MakeAssignRequest()
 	for n, v := range m {
 		if n == clientmodel.MetricNameLabel {
 			if _, ok := c.metricNameUIDs[TagValue(v)]; !ok {
@@ -291,10 +295,10 @@ func (c *Client) getTSUID(m clientmodel.Metric) (string, error) {
 		for tv, err := range resp.MetricNameErrors {
 			c.metricNameUIDs[tv] = err[len(err)-6:]
 		}
-		for k, uid := range resp.TagKeyErrors {
+		for k, uid := range resp.TagKeys {
 			c.tagKeyUIDs[k] = uid
 		}
-		for k, err := range resp.TagKeys {
+		for k, err := range resp.TagKeyErrors {
 			c.tagKeyUIDs[k] = err[len(err)-6:]
 		}
 		for tv, uid := range resp.TagValues {

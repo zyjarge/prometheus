@@ -545,7 +545,7 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 							// but that needs some more changes to not introduce
 							// circular import chains. For now, we go with the following,
 							// quite complicted and wasteful code...
-							tsdbChunk := make(chunk, 0, len(samples)+len(currentChunk))
+							tsdbChunk := make(chunk, len(samples), len(samples)+len(currentChunk))
 							for i, sample := range samples {
 								tsdbChunk[i] = SamplePair{
 									Timestamp: sample.Timestamp,
