@@ -47,7 +47,7 @@ func (c *TestTSDBClient) Store(s clientmodel.Samples) error {
 }
 
 func (c *TestTSDBClient) Retrieve(
-	fp *clientmodel.Fingerprint,
+	m clientmodel.Metric,
 	startTime clientmodel.Timestamp,
 	endTime clientmodel.Timestamp,
 ) (clientmodel.Samples, error) {
