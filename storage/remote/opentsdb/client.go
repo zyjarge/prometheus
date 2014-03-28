@@ -60,7 +60,7 @@ type StoreSamplesRequest struct {
 	Tags       map[string]TagValue `json:"tags"`
 }
 
-// GetSampleResponse represents the JSON response sent by OpenTSDB upon getting
+// GetSamplesResponse represents the JSON response sent by OpenTSDB upon getting
 // time series.
 type GetSamplesResponse struct {
 	MetricName    TagValue            `json:"metric"`
@@ -77,8 +77,13 @@ type AssignRequest struct {
 	TagValues   []TagValue `json:"tagv"`
 }
 
+// MakeAssignRequest creates an AssignRequest with empty slices for each field.
 func MakeAssignRequest() AssignRequest {
-	return AssignRequest{MetricNames: []TagValue{}, TagKeys: []string{}, TagValues: []TagValue{}}
+	return AssignRequest{
+		MetricNames: []TagValue{},
+		TagKeys:     []string{},
+		TagValues:   []TagValue{},
+	}
 }
 
 // AssignResponse represents the JSON repsonse sent by OpenTSDB to tell us about

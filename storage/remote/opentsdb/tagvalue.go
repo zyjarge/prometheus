@@ -146,9 +146,10 @@ func (tv *TagValue) UnmarshalJSON(json []byte) error {
 
 // TagValueToStringMap maps TagValues to strings. It is required as a named type
 // to ensure proper JSON encoding. (Normal maps must have plain strings as keys
-// to be (un-) marshable by the JSON library.)
+// to be (un-)marshable by the JSON library.)
 type TagValueToStringMap map[TagValue]string
 
+// MarshalJSON implements json.Marshaler.
 func (m TagValueToStringMap) MarshalJSON() ([]byte, error) {
 	var result bytes.Buffer
 	result.WriteByte('{')
@@ -172,6 +173,7 @@ func (m TagValueToStringMap) MarshalJSON() ([]byte, error) {
 	return result.Bytes(), nil
 }
 
+// UnmarshalJSON implements json.Unmarshaler.
 func (m *TagValueToStringMap) UnmarshalJSON(j []byte) error {
 	// To not reimplement the whole shebang to unmarshal maps, first
 	// unmarshal the TagValueToStringMap as a normal string map.
