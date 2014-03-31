@@ -31,25 +31,45 @@ const (
 )
 
 var (
-	samplesCount = prometheus.NewCounter()
-	sendLatency  = prometheus.NewDefaultHistogram()
-	queueSize    = prometheus.NewGauge()
+	sentSamplesCount        = prometheus.NewCounter()
+	receivedSamplesCount    = prometheus.NewCounter()
+	sentBatchesCount        = prometheus.NewCounter()
+	receivedTimeSeriesCount = prometheus.NewCounter()
+	sendLatency             = prometheus.NewDefaultHistogram()
+	receiveLatency          = prometheus.NewDefaultHistogram()
+	queueSize               = prometheus.NewGauge()
 )
 
-func recordOutcome(duration time.Duration, sampleCount int, err error) {
+func recordSendOutcome(duration time.Duration, sampleCount int, err error) {
 	labels := map[string]string{result: success}
 	if err != nil {
 		labels[result] = failure
 	}
 
-	samplesCount.IncrementBy(labels, float64(sampleCount))
+	sentSamplesCount.IncrementBy(labels, float64(sampleCount))
+	sentBatchesCount.Increment(labels)
 	ms := float64(duration / time.Millisecond)
 	sendLatency.Add(labels, ms)
 }
 
-func init() {
-	prometheus.Register("prometheus_remote_tsdb_sent_samples_total", "Total number of samples processed to be sent to remote TSDB.", prometheus.NilLabels, samplesCount)
+func RecordReceiveOutcome(duration time.Duration, sampleCount int, err error) {
+	labels := map[string]string{result: success}
+	if err != nil {
+		labels[result] = failure
+	}
 
-	prometheus.Register("prometheus_remote_tsdb_latency_ms", "Latency quantiles for sending samples to the remote TSDB in milliseconds.", prometheus.NilLabels, sendLatency)
+	receivedSamplesCount.IncrementBy(labels, float64(sampleCount))
+	receivedTimeSeriesCount.Increment(labels)
+	ms := float64(duration / time.Millisecond)
+	receiveLatency.Add(labels, ms)
+}
+
+func init() {
+	prometheus.Register("prometheus_remote_tsdb_sent_samples_total", "Total number of samples processed to be sent to remote TSDB.", prometheus.NilLabels, sentSamplesCount)
+	prometheus.Register("prometheus_remote_tsdb_received_samples_total", "Total number of samples received from remote TSDB.", prometheus.NilLabels, receivedSamplesCount)
+	prometheus.Register("prometheus_remote_tsdb_sent_batches_total", "Total number of sample batches processed to be sent to remote TSDB.", prometheus.NilLabels, sentBatchesCount)
+	prometheus.Register("prometheus_remote_tsdb_received_time_series_total", "Total number of time series received from remote TSDB.", prometheus.NilLabels, receivedTimeSeriesCount)
+	prometheus.Register("prometheus_remote_tsdb_send_latency_ms", "Latency quantiles for sending samples to the remote TSDB in milliseconds.", prometheus.NilLabels, sendLatency)
+	prometheus.Register("prometheus_remote_tsdb_receive_latency_ms", "Latency quantiles for receiving samples from the remote TSDB in milliseconds.", prometheus.NilLabels, receiveLatency)
 	prometheus.Register("prometheus_remote_tsdb_queue_size_total", "The size and capacity of the queue of samples to be sent to the remote TSDB.", prometheus.NilLabels, queueSize)
 }

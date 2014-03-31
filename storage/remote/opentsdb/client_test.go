@@ -73,3 +73,32 @@ func TestMarshalStoreSamplesRequest(t *testing.T) {
 		)
 	}
 }
+
+func TestGetTSUID(t *testing.T) {
+	// This tests only the part assembling the TSUID. It does not run any
+	// HTTP queries to retrieve missing UIDs.
+	c := Client{
+		metricNameUIDs: TagValueToStringMap{},
+		tagKeyUIDs:     map[string]string{},
+		tagValueUIDs:   TagValueToStringMap{},
+	}
+	c.metricNameUIDs["metricname"] = "ABCDEF"
+	c.tagKeyUIDs["tagkey1"] = "100000"
+	c.tagValueUIDs["tagvalue1"] = "100001"
+	c.tagKeyUIDs["tagkey2"] = "200000"
+	c.tagValueUIDs["tagvalue2"] = "000002"
+
+	m := clientmodel.Metric{
+		clientmodel.MetricNameLabel: "metricname",
+		"tagkey1":                   "tagvalue1",
+		"tagkey2":                   "tagvalue2",
+	}
+
+	got, err := c.getTSUID(m)
+	if err != nil {
+		t.Fatalf("getTSUID(%#v) resulted in err:", m, err)
+	}
+	if expected := "ABCDEF100000100001200000000002"; got != expected {
+		t.Errorf("getTSUID(%#v) => %q, want %q", m, got, expected)
+	}
+}

@@ -121,7 +121,7 @@ func (s compactionTestScenario) test(t *testing.T) {
 	defer flag.Set("leveldbChunkSize", flag.Lookup("leveldbChunkSize").Value.String())
 	flag.Set("leveldbChunkSize", fmt.Sprintf("%d", s.leveldbChunkSize))
 
-	ts, closer := NewTestTieredStorage(t)
+	ts, closer := NewTestTieredStorage(t, nil)
 	defer closer.Close()
 
 	// 1. Store test values.

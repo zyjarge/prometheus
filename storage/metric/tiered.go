@@ -393,7 +393,7 @@ func (t *TieredStorage) seriesTooOld(f *clientmodel.Fingerprint, i clientmodel.T
 }
 
 func (t *TieredStorage) renderView(viewJob viewJob) {
-	// TODO: This method is faaaar too long and convoluted.
+	// TODO(all): This method is faaaar too long and convoluted.
 
 	// Telemetry.
 	var err error
@@ -533,18 +533,21 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 					endTime = currentChunk[0].Timestamp
 				}
 				if targetTime.Before(endTime) {
+					tsdbTimer := viewJob.stats.GetTimer(stats.ViewTSDBExtractionTime).Start()
 					metric, err := t.GetMetricForFingerprint(fp)
 					if err != nil {
 						glog.Warningf("cannot find metric for fingerprint %v: %s", fp, err)
 					} else {
+						begun := time.Now()
 						samples, err := t.tsdb.Retrieve(metric, targetTime, endTime)
+						remote.RecordReceiveOutcome(time.Since(begun), len(samples), err)
 						if err != nil {
 							glog.Warningf("retrieving values from TSDB failed: %s", err)
 						} else {
 							// TODO(bjoern): tsdb.Retrieve should return Values directly,
 							// but that needs some more changes to not introduce
 							// circular import chains. For now, we go with the following,
-							// quite complicted and wasteful code...
+							// quite complicated and wasteful code...
 							tsdbChunk := make(chunk, len(samples), len(samples)+len(currentChunk))
 							for i, sample := range samples {
 								tsdbChunk[i] = SamplePair{
@@ -555,6 +558,7 @@ func (t *TieredStorage) renderView(viewJob viewJob) {
 							currentChunk = append(tsdbChunk, currentChunk...)
 						}
 					}
+					tsdbTimer.Stop()
 				}
 			}
 

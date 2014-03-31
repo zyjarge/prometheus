@@ -15,6 +15,7 @@ package metric
 
 import (
 	"math"
+	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -22,8 +23,63 @@ import (
 	clientmodel "github.com/prometheus/client_golang/model"
 
 	"github.com/prometheus/prometheus/stats"
+	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/prometheus/prometheus/utility/test"
 )
+
+type mockTSDB struct {
+	i                   int
+	Count               int
+	t                   test.Tester
+	expectedMetric      clientmodel.Metric
+	expectedStartTime   clientmodel.Timestamp
+	expectedEndTime     clientmodel.Timestamp
+	cannedResultSamples clientmodel.Samples
+	cannedResultError   error
+}
+
+func newMockTSDB(t test.Tester, i int) *mockTSDB {
+	return &mockTSDB{i: i, t: t}
+}
+
+func (tsdb *mockTSDB) Store(clientmodel.Samples) error {
+	// Deliberately not implemented.
+	panic("unexpected call of Store")
+}
+
+func (tsdb *mockTSDB) Retrieve(
+	metric clientmodel.Metric,
+	startTime clientmodel.Timestamp,
+	endTime clientmodel.Timestamp,
+) (clientmodel.Samples, error) {
+	tsdb.Count++
+	if !reflect.DeepEqual(metric, tsdb.expectedMetric) ||
+		startTime != tsdb.expectedStartTime ||
+		endTime != tsdb.expectedEndTime {
+		tsdb.t.Errorf(
+			"%d. TSDBClient.Retrieve(%#v, %v, %v), want Retrieve(%#v, %v, %v)",
+			tsdb.i,
+			metric, startTime, endTime,
+			tsdb.expectedMetric, tsdb.expectedStartTime, tsdb.expectedEndTime,
+		)
+	}
+	return tsdb.cannedResultSamples, tsdb.cannedResultError
+}
+
+func (tsdb *mockTSDB) SetExpectedRetrieve(
+	metric clientmodel.Metric,
+	startTime clientmodel.Timestamp,
+	endTime clientmodel.Timestamp,
+) {
+	tsdb.expectedMetric = metric
+	tsdb.expectedStartTime = startTime
+	tsdb.expectedEndTime = endTime
+}
+
+func (tsdb *mockTSDB) SetResult(samples clientmodel.Samples, err error) {
+	tsdb.cannedResultSamples = samples
+	tsdb.cannedResultError = err
+}
 
 func buildSamples(from, to clientmodel.Timestamp, interval time.Duration, m clientmodel.Metric) (v clientmodel.Samples) {
 	i := clientmodel.SampleValue(0)
@@ -56,7 +112,7 @@ func buildValues(firstValue clientmodel.SampleValue, from, to clientmodel.Timest
 	return
 }
 
-func testMakeView(t test.Tester, flushToDisk bool) {
+func testMakeView(t test.Tester, flushToDisk bool, useTSDB bool) {
 	type in struct {
 		atTime     []getValuesAtTimeOp
 		atInterval []getValuesAtIntervalOp
@@ -68,6 +124,11 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 		atInterval []Values
 		alongRange []Values
 	}
+	type tsdbCall struct {
+		startTime clientmodel.Timestamp // 0 => 'no calls expected'.
+		endTime   clientmodel.Timestamp
+		samples   clientmodel.Samples
+	}
 	metric := clientmodel.Metric{clientmodel.MetricNameLabel: "request_count"}
 	fingerprint := &clientmodel.Fingerprint{}
 	fingerprint.LoadFromMetric(metric)
@@ -77,9 +138,11 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 			data     clientmodel.Samples
 			in       in
 			out      out
+			tsdbCall tsdbCall
 			diskOnly bool
+			tsdbOnly bool
 		}{
-			// No sample, but query asks for one.
+			// 0. No sample, but query asks for one.
 			{
 				in: in{
 					atTime: []getValuesAtTimeOp{
@@ -92,7 +155,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					atTime: []Values{{}},
 				},
 			},
-			// Single sample, query asks for exact sample time.
+			// 1. Single sample, query asks for exact sample time.
 			{
 				data: clientmodel.Samples{
 					{
@@ -119,7 +182,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Single sample, query time before the sample.
+			// 2. Single sample, query time before the sample.
 			{
 				data: clientmodel.Samples{
 					{
@@ -150,8 +213,13 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 						},
 					},
 				},
+				tsdbCall: tsdbCall{
+					startTime: instant,
+					endTime:   instant.Add(time.Second),
+					samples:   clientmodel.Samples{},
+				},
 			},
-			// Single sample, query time after the sample.
+			// 3. Single sample, query time after the sample.
 			{
 				data: clientmodel.Samples{
 					{
@@ -178,7 +246,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Two samples, query asks for first sample time.
+			// 4. Two samples, query asks for first sample time.
 			{
 				data: clientmodel.Samples{
 					{
@@ -210,7 +278,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Three samples, query asks for second sample time.
+			// 5. Three samples, query asks for second sample time.
 			{
 				data: clientmodel.Samples{
 					{
@@ -247,7 +315,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Three samples, query asks for time between first and second samples.
+			// 6. Three samples, query asks for time between first and second samples.
 			{
 				data: clientmodel.Samples{
 					{
@@ -288,7 +356,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Three samples, query asks for time between second and third samples.
+			// 7. Three samples, query asks for time between second and third samples.
 			{
 				data: clientmodel.Samples{
 					{
@@ -329,7 +397,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Two chunks of samples, query asks for values from second chunk.
+			// 8. Two chunks of samples, query asks for values from second chunk.
 			{
 				data: buildSamples(
 					instant,
@@ -359,7 +427,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Two chunks of samples, query asks for values between both chunks.
+			// 9. Two chunks of samples, query asks for values between both chunks.
 			{
 				data: buildSamples(
 					instant,
@@ -389,7 +457,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Two chunks of samples, getValuesAtIntervalOp spanning both.
+			// 10. Two chunks of samples, getValuesAtIntervalOp spanning both.
 			{
 				data: buildSamples(
 					instant,
@@ -431,7 +499,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Three chunks of samples, getValuesAlongRangeOp spanning all of them.
+			// 11. Three chunks of samples, getValuesAlongRangeOp spanning all of them.
 			{
 				data: buildSamples(
 					instant,
@@ -456,7 +524,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					)},
 				},
 			},
-			// Three chunks of samples and a getValuesAlongIntervalOp with an
+			// 12. Three chunks of samples and a getValuesAlongIntervalOp with an
 			// interval larger than the natural sample interval, spanning the gap
 			// between the second and third chunks. To test two consecutive
 			// ExtractSamples() calls for the same op, we need three on-disk chunks,
@@ -524,7 +592,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 				// extracted value at the end of the second chunk.
 				diskOnly: true,
 			},
-			// Single sample, getValuesAtIntervalOp starting after the sample.
+			// 13. Single sample, getValuesAtIntervalOp starting after the sample.
 			{
 				data: clientmodel.Samples{
 					{
@@ -555,7 +623,7 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 					},
 				},
 			},
-			// Single sample, getValuesAtIntervalOp starting before the sample.
+			// 14. Single sample, getValuesAtIntervalOp starting before the sample.
 			{
 				data: clientmodel.Samples{
 					{
@@ -589,6 +657,188 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 						},
 					},
 				},
+				tsdbCall: tsdbCall{
+					startTime: instant,
+					endTime:   instant.Add(time.Second),
+					samples:   clientmodel.Samples{},
+				},
+			},
+			// 15. Single sample, query time before the sample, similar to 2. but now TSDB has a value before the query time.
+			{
+				data: clientmodel.Samples{
+					{
+						Metric:    metric,
+						Value:     0,
+						Timestamp: instant.Add(time.Second),
+					},
+					{
+						Metric:    metric,
+						Value:     1,
+						Timestamp: instant.Add(time.Second * 2),
+					},
+				},
+				in: in{
+					atTime: []getValuesAtTimeOp{
+						{
+							baseOp: baseOp{current: instant},
+						},
+					},
+				},
+				out: out{
+					atTime: []Values{
+						{
+							{
+								Timestamp: instant.Add(-time.Second),
+								Value:     -2,
+							},
+							{
+								Timestamp: instant.Add(time.Second),
+								Value:     0,
+							},
+						},
+					},
+				},
+				tsdbCall: tsdbCall{
+					startTime: instant,
+					endTime:   instant.Add(time.Second),
+					samples: clientmodel.Samples{
+						&clientmodel.Sample{Metric: metric, Value: -2, Timestamp: instant.Add(-time.Second)},
+					},
+				},
+				tsdbOnly: true,
+			},
+			// 16. Single sample, query time before the sample, similar to 2. but now TSDB has a value at exactly the query time.
+			{
+				data: clientmodel.Samples{
+					{
+						Metric:    metric,
+						Value:     0,
+						Timestamp: instant.Add(time.Second),
+					},
+					{
+						Metric:    metric,
+						Value:     1,
+						Timestamp: instant.Add(time.Second * 2),
+					},
+				},
+				in: in{
+					atTime: []getValuesAtTimeOp{
+						{
+							baseOp: baseOp{current: instant},
+						},
+					},
+				},
+				out: out{
+					atTime: []Values{
+						{
+							{
+								Timestamp: instant,
+								Value:     -1,
+							},
+						},
+					},
+				},
+				tsdbCall: tsdbCall{
+					startTime: instant,
+					endTime:   instant.Add(time.Second),
+					samples: clientmodel.Samples{
+						&clientmodel.Sample{Metric: metric, Value: -1, Timestamp: instant},
+					},
+				},
+				tsdbOnly: true,
+			},
+			// 17. Single sample, query time before the sample, similar to 2. but now TSDB has a value after the query time.
+			// Note that TSDB will _not_ return a value before the query time (in contrast to the local storage).
+			{
+				data: clientmodel.Samples{
+					{
+						Metric:    metric,
+						Value:     0,
+						Timestamp: instant.Add(time.Second),
+					},
+					{
+						Metric:    metric,
+						Value:     1,
+						Timestamp: instant.Add(time.Second * 2),
+					},
+				},
+				in: in{
+					atTime: []getValuesAtTimeOp{
+						{
+							baseOp: baseOp{current: instant.Add(-time.Second)},
+						},
+					},
+				},
+				out: out{
+					atTime: []Values{
+						{
+							{
+								Timestamp: instant,
+								Value:     -1,
+							},
+						},
+					},
+				},
+				tsdbCall: tsdbCall{
+					startTime: instant.Add(-time.Second),
+					endTime:   instant.Add(time.Second),
+					samples: clientmodel.Samples{
+						&clientmodel.Sample{Metric: metric, Value: -1, Timestamp: instant},
+					},
+				},
+				tsdbOnly: true,
+			},
+			// 18. getValuesAtIntervalOp starting before the sample, with values in TSDB.
+			{
+				data: clientmodel.Samples{
+					{
+						Metric:    metric,
+						Value:     0,
+						Timestamp: instant.Add(time.Second),
+					},
+				},
+				in: in{
+					atInterval: []getValuesAtIntervalOp{
+						{
+							getValuesAlongRangeOp: getValuesAlongRangeOp{
+								baseOp:  baseOp{current: instant.Add(-time.Second)},
+								through: instant.Add(time.Second * 2),
+							},
+							interval: time.Second,
+						},
+					},
+				},
+				out: out{
+					atInterval: []Values{
+						{
+							{
+								Timestamp: instant.Add(-time.Second),
+								Value:     -2,
+							},
+							{
+								Timestamp: instant,
+								Value:     -1,
+							},
+							{
+								Timestamp: instant.Add(time.Second),
+								Value:     0,
+							},
+							{
+								Timestamp: instant.Add(time.Second),
+								Value:     0,
+							},
+						},
+					},
+				},
+				tsdbCall: tsdbCall{
+					startTime: instant.Add(-time.Second),
+					endTime:   instant.Add(time.Second),
+					samples: clientmodel.Samples{
+						&clientmodel.Sample{Metric: metric, Value: -2, Timestamp: instant.Add(-time.Second)},
+						&clientmodel.Sample{Metric: metric, Value: -1, Timestamp: instant},
+					},
+				},
+				tsdbOnly: true,
 			},
 		}
 	)
@@ -597,8 +847,21 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 		if scenario.diskOnly && !flushToDisk {
 			continue
 		}
+		if scenario.tsdbOnly && !useTSDB {
+			continue
+		}
 
-		tiered, closer := NewTestTieredStorage(t)
+		var tsdb *mockTSDB
+		var tsdbClient remote.TSDBClient
+		if useTSDB {
+			tsdb = newMockTSDB(t, i)
+			if scenario.tsdbCall.startTime != 0 {
+				tsdb.SetExpectedRetrieve(metric, scenario.tsdbCall.startTime, scenario.tsdbCall.endTime)
+				tsdb.SetResult(scenario.tsdbCall.samples, nil)
+			}
+			tsdbClient = tsdb
+		}
+		tiered, closer := NewTestTieredStorage(t, tsdbClient)
 
 		err := tiered.AppendSamples(scenario.data)
 		if err != nil {
@@ -675,36 +938,47 @@ func testMakeView(t test.Tester, flushToDisk bool) {
 
 			for k, value := range alongRange {
 				if value.Value != actual[k].Value {
-					t.Fatalf("%d.%d.%d expected %v value, got %v", i, j, k, value.Value, actual[k].Value)
+					t.Errorf("%d.%d.%d expected %v value, got %v", i, j, k, value.Value, actual[k].Value)
 				}
 				if !value.Timestamp.Equal(actual[k].Timestamp) {
-					t.Fatalf("%d.%d.%d expected %s (offset %ss) timestamp, got %s (offset %ss)", i, j, k, value.Timestamp, value.Timestamp.Sub(instant), actual[k].Timestamp, actual[k].Timestamp.Sub(instant))
+					t.Errorf("%d.%d.%d expected %s (offset %ss) timestamp, got %s (offset %ss)", i, j, k, value.Timestamp, value.Timestamp.Sub(instant), actual[k].Timestamp, actual[k].Timestamp.Sub(instant))
 				}
 			}
 		}
 
+		if useTSDB {
+			if scenario.tsdbCall.startTime == 0 && tsdb.Count > 0 {
+				t.Errorf("%d. expected no TSDBClient.Retrieve call, got %d", i, tsdb.Count)
+			} else if scenario.tsdbCall.startTime != 0 && tsdb.Count != 1 {
+				t.Errorf("%d. expected exactly 1 TSDBClient.Retrieve call, got %d", i, tsdb.Count)
+			}
+		}
 		closer.Close()
 	}
 }
 
 func TestMakeViewFlush(t *testing.T) {
-	testMakeView(t, true)
+	testMakeView(t, true, false)
 }
 
 func BenchmarkMakeViewFlush(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		testMakeView(b, true)
+		testMakeView(b, true, false)
 	}
 }
 
 func TestMakeViewNoFlush(t *testing.T) {
-	testMakeView(t, false)
+	testMakeView(t, false, false)
 }
 
 func BenchmarkMakeViewNoFlush(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		testMakeView(b, false)
+		testMakeView(b, false, false)
 	}
+}
+
+func TestMakeViewTSDB(t *testing.T) {
+	testMakeView(t, true, true)
 }
 
 func TestGetAllValuesForLabel(t *testing.T) {
@@ -769,7 +1043,7 @@ func TestGetAllValuesForLabel(t *testing.T) {
 	}
 
 	for i, scenario := range scenarios {
-		tiered, closer := NewTestTieredStorage(t)
+		tiered, closer := NewTestTieredStorage(t, nil)
 		for j, metric := range scenario.in {
 			sample := &clientmodel.Sample{
 				Metric: clientmodel.Metric{clientmodel.MetricNameLabel: clientmodel.LabelValue(metric.metricName)},
@@ -804,7 +1078,7 @@ func TestGetAllValuesForLabel(t *testing.T) {
 }
 
 func TestGetFingerprintsForLabelSet(t *testing.T) {
-	tiered, closer := NewTestTieredStorage(t)
+	tiered, closer := NewTestTieredStorage(t, nil)
 	defer closer.Close()
 	memorySample := &clientmodel.Sample{
 		Metric: clientmodel.Metric{clientmodel.MetricNameLabel: "http_requests", "method": "/foo"},
@@ -1020,7 +1294,7 @@ func TestTruncateBefore(t *testing.T) {
 }
 
 func TestGetMetricForFingerprintCachesCopyOfMetric(t *testing.T) {
-	ts, closer := NewTestTieredStorage(t)
+	ts, closer := NewTestTieredStorage(t, nil)
 	defer closer.Close()
 
 	m := clientmodel.Metric{

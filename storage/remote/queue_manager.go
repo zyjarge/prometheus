@@ -31,8 +31,8 @@ const (
 	batchSendDeadline = 5 * time.Second
 )
 
-// TSDBClient defines an interface for sending a batch of samples to an
-// external timeseries database (TSDB).
+// TSDBClient defines an interface for storing and retrieving samples to and
+// from an external timeseries database (TSDB).
 type TSDBClient interface {
 	Store(clientmodel.Samples) error
 	Retrieve(
@@ -68,7 +68,7 @@ func (t *TSDBQueueManager) Queue(s clientmodel.Samples) {
 	select {
 	case t.queue <- s:
 	default:
-		samplesCount.IncrementBy(map[string]string{result: dropped}, float64(len(s)))
+		sentSamplesCount.IncrementBy(map[string]string{result: dropped}, float64(len(s)))
 		glog.Warningf("TSDB queue full, discarding %d samples", len(s))
 	}
 }
@@ -83,7 +83,7 @@ func (t *TSDBQueueManager) sendSamples(s clientmodel.Samples) {
 	// sent correctly the first time, it's simply dropped on the floor.
 	begin := time.Now()
 	err := t.tsdb.Store(s)
-	recordOutcome(time.Since(begin), len(s), err)
+	recordSendOutcome(time.Since(begin), len(s), err)
 
 	if err != nil {
 		glog.Warningf("error sending %d samples to TSDB: %s", len(s), err)

@@ -19,6 +19,7 @@ import (
 
 	clientmodel "github.com/prometheus/client_golang/model"
 
+	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/prometheus/prometheus/utility/test"
 )
 
@@ -87,9 +88,9 @@ func (t *testTieredStorageCloser) Close() {
 	t.directory.Close()
 }
 
-func NewTestTieredStorage(t test.Tester) (*TieredStorage, test.Closer) {
+func NewTestTieredStorage(t test.Tester, tsdb remote.TSDBClient) (*TieredStorage, test.Closer) {
 	directory := test.NewTemporaryDirectory("test_tiered_storage", t)
-	storage, err := NewTieredStorage(2500, 1000, 5*time.Second, 0, directory.Path(), nil)
+	storage, err := NewTieredStorage(2500, 1000, 5*time.Second, 0, directory.Path(), tsdb)
 
 	if err != nil {
 		if storage != nil {

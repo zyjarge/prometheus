@@ -242,6 +242,7 @@ func (c *Client) Retrieve(
 	return result, nil
 }
 
+// getTSUID calculates the time series unique ID (TSUID) as it is used bey OpenTSDB.
 func (c *Client) getTSUID(m clientmodel.Metric) (string, error) {
 	// Gather the metric names, tag keys, and tag values for which no UID is cached.
 	req := MakeAssignRequest()
@@ -284,6 +285,7 @@ func (c *Client) getTSUID(m clientmodel.Metric) (string, error) {
 		defer httpResp.Body.Close()
 		// We deliberately ignore the status code. A 400 is actually expected
 		// (but not guaranteed...). This is dirty stuff...
+		// TODO(bjoern): Make sure to only ignore the 'right' kind of errors.
 		jsonResp, err := ioutil.ReadAll(httpResp.Body)
 		if err != nil {
 			return "", err
@@ -293,7 +295,7 @@ func (c *Client) getTSUID(m clientmodel.Metric) (string, error) {
 			return "", err
 		}
 		// As said, this is dirty. We will extract UIDs from error messages, too...
-		// TODO(bjoern): Once API v2.1 is there, this can be done in a clean way.
+		// TODO(bjoern): Once OpenTSDB v2.1 is there, this can be done in a clean way.
 		for tv, uid := range resp.MetricNames {
 			c.metricNameUIDs[tv] = uid
 		}

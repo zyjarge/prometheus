@@ -355,6 +355,8 @@ func main() {
 		if block.Err == nil && len(block.Samples) > 0 {
 			ts.AppendSamples(block.Samples)
 			if remoteTSDBQueue != nil {
+				// TODO(bjoern): Make selection of timeseries to be saved configurable.
+				// Consider downsampling before saving.
 				remoteTSDBQueue.Queue(block.Samples)
 			}
 		}
