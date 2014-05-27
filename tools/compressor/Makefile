@@ -11,28 +11,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: compressor dumper pruner rule_checker
+MAKE_ARTIFACTS = compressor
+
+all: compressor
 
 SUFFIXES:
 
-include ../Makefile.INCLUDE
+include ../../Makefile.INCLUDE
 
-compressor:
-	$(MAKE) -C compressor
-
-dumper:
-	$(MAKE) -C dumper
-
-pruner:
-	$(MAKE) -C pruner
-
-rule_checker:
-	$(MAKE) -C rule_checker
+compressor: $(shell find . -iname '*.go')
+	$(GO) build -o compressor .
 
 clean:
-	$(MAKE) -C compressor clean
-	$(MAKE) -C dumper clean
-	$(MAKE) -C pruner clean
-	$(MAKE) -C rule_checker clean
+	rm -rf $(MAKE_ARTIFACTS)
 
-.PHONY: clean compressor dumper pruner rule_checker
+.PHONY: clean
