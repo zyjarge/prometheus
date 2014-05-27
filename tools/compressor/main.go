@@ -94,14 +94,16 @@ func (c *SamplesCompressor) Operate(key, value interface{}) *storage.OperatorErr
 			if delta < 0 {
 				delta = -delta
 			}
-			if delta < 2^8 {
-				c.int8Deltas++
-			} else if delta < 2^16 {
-				c.int16Deltas++
-			} else if delta < 2^32 {
-				c.int32Deltas++
-			} else if delta < 2^64 {
-				c.int64Deltas++
+			if float64(int64(delta)) == delta {
+				if delta < 2^8 {
+					c.int8Deltas++
+				} else if delta < 2^16 {
+					c.int16Deltas++
+				} else if delta < 2^32 {
+					c.int32Deltas++
+				} else if delta < 2^64 {
+					c.int64Deltas++
+				}
 			}
 
 			c.prevValue = val
