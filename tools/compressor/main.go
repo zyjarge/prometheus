@@ -52,6 +52,14 @@ type SamplesCompressor struct {
 	compressors       map[string]compressFn
 	compressedBytes   map[string]int
 	pendingSamples    metric.Values
+
+	prevValue     float64
+	float32Values int
+	intValues     int
+	int8Deltas    int
+	int16Deltas   int
+	int32Deltas   int
+	int64Deltas   int
 }
 
 func (c *SamplesCompressor) Operate(key, value interface{}) *storage.OperatorError {
@@ -71,10 +79,37 @@ func (c *SamplesCompressor) Operate(key, value interface{}) *storage.OperatorErr
 	} else {
 		c.dest = c.dest[0:sz]
 	}
-	for i, val := range c.pendingSamples {
+
+	c.prevValue = float64(c.pendingSamples[0].Value)
+	for i, sample := range c.pendingSamples {
+		val := float64(sample.Value)
+		if float64(float32(val)) == val {
+			c.float32Values++
+		}
+		if float64(int64(val)) == val {
+			c.intValues++
+		}
+		if i > 0 {
+			delta := c.prevValue - val
+			if delta < 0 {
+				delta = -delta
+			}
+			if delta < 2^8 {
+				c.int8Deltas++
+			} else if delta < 2^16 {
+				c.int16Deltas++
+			} else if delta < 2^32 {
+				c.int32Deltas++
+			} else if delta < 2^64 {
+				c.int64Deltas++
+			}
+
+			c.prevValue = val
+		}
+
 		offset := i * sampleSize
-		binary.LittleEndian.PutUint64(c.dest[offset:], uint64(val.Timestamp.Unix()))
-		binary.LittleEndian.PutUint64(c.dest[offset+8:], math.Float64bits(float64(val.Value)))
+		binary.LittleEndian.PutUint64(c.dest[offset:], uint64(sample.Timestamp.Unix()))
+		binary.LittleEndian.PutUint64(c.dest[offset+8:], math.Float64bits(float64(sample.Value)))
 	}
 	c.uncompressedBytes += sz
 
@@ -90,6 +125,12 @@ func (c *SamplesCompressor) Report() {
 	glog.Infof("Chunks: %d", c.chunks)
 	glog.Infof("Samples: %d", c.samples)
 	glog.Infof("Avg. chunk size: %d", c.samples/c.chunks)
+	glog.Infof("float32 values: %d", c.float32Values)
+	glog.Infof("intValues: %d (%.1f%%)", c.intValues, 100*float64(c.intValues)/float64(c.samples))
+	glog.Infof("int8Deltas: %d (%.1f%%)", c.int8Deltas, 100*float64(c.int8Deltas)/float64(c.samples))
+	glog.Infof("int16Deltas: %d (%.1f%%)", c.int16Deltas, 100*float64(c.int16Deltas)/float64(c.samples))
+	glog.Infof("int32Deltas: %d (%.1f%%)", c.int32Deltas, 100*float64(c.int32Deltas)/float64(c.samples))
+	glog.Infof("int64Deltas: %d (%.1f%%)", c.int64Deltas, 100*float64(c.int64Deltas)/float64(c.samples))
 	glog.Infof("Total: %d (100%%)", c.uncompressedBytes)
 	for algo, _ := range c.compressors {
 		glog.Infof("%s: %d (%.1f%%)", algo, c.compressedBytes[algo], 100*float64(c.compressedBytes[algo])/float64(c.uncompressedBytes))
