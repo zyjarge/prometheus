@@ -36,7 +36,10 @@ var (
 	dieOnBadChunk = flag.Bool("dieOnBadChunk", false, "Whether to die upon encountering a bad chunk.")
 )
 
-const sampleSize = 16
+const (
+	sampleSize       = 16
+	minimumChunkSize = 5000
+)
 
 type compressFn func([]byte) int
 
@@ -47,22 +50,27 @@ type SamplesCompressor struct {
 	uncompressedBytes int
 	compressors       map[string]compressFn
 	compressedBytes   map[string]int
+	pendingSamples    metric.Values
 }
 
 func (c *SamplesCompressor) Operate(key, value interface{}) *storage.OperatorError {
 	v := value.(metric.Values)
+	c.pendingSamples = append(c.pendingSamples, v...)
+	if len(c.pendingSamples) < minimumChunkSize {
+		return nil
+	}
 
-	glog.Info("Chunk size: ", len(v))
+	glog.Info("Chunk size: ", len(c.pendingSamples))
 	c.chunks++
-	c.samples += len(v)
+	c.samples += len(c.pendingSamples)
 
-	sz := len(v) * sampleSize
+	sz := len(c.pendingSamples) * sampleSize
 	if cap(c.dest) < sz {
 		c.dest = make([]byte, sz)
 	} else {
 		c.dest = c.dest[0:sz]
 	}
-	for i, val := range v {
+	for i, val := range c.pendingSamples {
 		offset := i * sampleSize
 		binary.LittleEndian.PutUint64(c.dest[offset:], uint64(val.Timestamp.Unix()))
 		binary.LittleEndian.PutUint64(c.dest[offset+8:], math.Float64bits(float64(val.Value)))
@@ -72,6 +80,8 @@ func (c *SamplesCompressor) Operate(key, value interface{}) *storage.OperatorErr
 	for algo, fn := range c.compressors {
 		c.compressedBytes[algo] += fn(c.dest)
 	}
+
+	c.pendingSamples = nil
 	return nil
 }
 
