@@ -18,6 +18,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"compress/lzw"
+	"compress/zlib"
 	"encoding/binary"
 	"flag"
 	"math"
@@ -103,6 +104,7 @@ var compressors = map[string]compressFn{
 			glog.Fatal(err)
 		}
 		w.Write(v)
+		w.Flush()
 		w.Close()
 		return b.Len()
 	},
@@ -113,6 +115,7 @@ var compressors = map[string]compressFn{
 			glog.Fatal(err)
 		}
 		w.Write(v)
+		w.Flush()
 		w.Close()
 		return b.Len()
 	},
@@ -129,6 +132,17 @@ var compressors = map[string]compressFn{
 			glog.Fatal(err)
 		}
 		return len(c)
+	},
+	"zlib": func(v []byte) int {
+		var b bytes.Buffer
+		w, err := zlib.NewWriterLevel(&b, zlib.BestCompression)
+		if err != nil {
+			glog.Fatal(err)
+		}
+		w.Write(v)
+		w.Flush()
+		w.Close()
+		return b.Len()
 	},
 }
 
