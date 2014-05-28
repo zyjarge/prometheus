@@ -21,7 +21,10 @@ import (
 	"compress/zlib"
 	"encoding/binary"
 	"flag"
+	"io/ioutil"
 	"math"
+	"os"
+	"os/exec"
 
 	"code.google.com/p/snappy-go/snappy"
 
@@ -186,6 +189,34 @@ var compressors = map[string]compressFn{
 		w.Flush()
 		w.Close()
 		return b.Len()
+	},
+	"bzip2": func(v []byte) int {
+		f, err := ioutil.TempFile("/tmp", "bzip2_test_")
+		if err != nil {
+			glog.Fatal(err)
+		}
+		_, err = f.Write(v)
+		if err != nil {
+			glog.Fatal(err)
+		}
+		tmpName := f.Name()
+		f.Close()
+
+		cmd := exec.Command("bzip2", tmpName)
+		if err = cmd.Run(); err != nil {
+			glog.Fatal(err)
+		}
+
+		tmpBzip2Name := tmpName + ".bz2"
+		fi, err := os.Stat(tmpBzip2Name)
+		if err != nil {
+			glog.Fatal(err)
+		}
+
+		if err := os.Remove(tmpBzip2Name); err != nil {
+			glog.Fatal(err)
+		}
+		return int(fi.Size())
 	},
 }
 
