@@ -202,7 +202,7 @@ var compressors = map[string]compressFn{
 		tmpName := f.Name()
 		f.Close()
 
-		cmd := exec.Command("bzip2", tmpName)
+		cmd := exec.Command("bzip2", "--best", tmpName)
 		if err = cmd.Run(); err != nil {
 			glog.Fatal(err)
 		}
