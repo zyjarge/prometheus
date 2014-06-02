@@ -25,10 +25,12 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"time"
 
 	"code.google.com/p/snappy-go/snappy"
-
 	"github.com/golang/glog"
+
+	clientmodel "github.com/prometheus/client_golang/model"
 
 	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/storage/metric"
@@ -42,7 +44,7 @@ var (
 
 const (
 	sampleSize       = 16
-	minimumChunkSize = 5000
+	minimumChunkSize = 1000
 )
 
 type compressFn func([]byte) int
@@ -56,13 +58,57 @@ type SamplesCompressor struct {
 	compressedBytes   map[string]int
 	pendingSamples    metric.Values
 
-	prevValue     float64
-	float32Values int
-	intValues     int
-	int8Deltas    int
-	int16Deltas   int
-	int32Deltas   int
-	int64Deltas   int
+	prevValue       float64
+	float32Values   int
+	intValues       int
+	int8Deltas      int
+	int16Deltas     int
+	int32Deltas     int
+	int64Deltas     int
+	deltaTimeBytes  int64
+	deltaValueBytes int64
+}
+
+func neededBytes(values metric.Values) (timeBytes, valueBytes int) {
+	timeBytes = 1
+	valueBytes = 1
+	for i, v := range values {
+		if i == 0 {
+			continue
+		}
+		deltaT := int64(v.Timestamp.Sub(values[0].Timestamp) / time.Second)
+		if timeBytes == 1 && deltaT >= (1<<8) {
+			timeBytes = 2
+		}
+		if timeBytes == 2 && deltaT >= (1<<16) {
+			timeBytes = 4
+		}
+		if timeBytes == 4 && deltaT >= (int64(1)<<32) {
+			timeBytes = 8
+		}
+
+		deltaV := v.Value - values[0].Value
+		if deltaV != clientmodel.SampleValue(int64(deltaV)) {
+			valueBytes = 4
+			if deltaV != clientmodel.SampleValue(float32(deltaV)) {
+				valueBytes = 8
+			}
+			continue
+		}
+		if deltaV < 0 {
+			deltaV = -deltaV
+		}
+		if valueBytes == 1 && deltaV >= 1<<8 {
+			valueBytes = 2
+		}
+		if valueBytes == 2 && deltaV >= 1<<16 {
+			valueBytes = 4
+		}
+		if valueBytes == 4 && deltaV >= clientmodel.SampleValue(int64(1)<<32) {
+			valueBytes = 8
+		}
+	}
+	return timeBytes, valueBytes
 }
 
 func (c *SamplesCompressor) Operate(key, value interface{}) *storage.OperatorError {
@@ -75,6 +121,10 @@ func (c *SamplesCompressor) Operate(key, value interface{}) *storage.OperatorErr
 	glog.Info("Chunk size: ", len(c.pendingSamples))
 	c.chunks++
 	c.samples += len(c.pendingSamples)
+
+	tb, vb := neededBytes(c.pendingSamples)
+	c.deltaTimeBytes += int64(tb * len(c.pendingSamples))
+	c.deltaValueBytes += int64(vb * len(c.pendingSamples))
 
 	sz := len(c.pendingSamples) * sampleSize
 	if cap(c.dest) < sz {
@@ -136,6 +186,9 @@ func (c *SamplesCompressor) Report() {
 	glog.Infof("int16Deltas: %d (%.1f%%)", c.int16Deltas, 100*float64(c.int16Deltas)/float64(c.samples))
 	glog.Infof("int32Deltas: %d (%.1f%%)", c.int32Deltas, 100*float64(c.int32Deltas)/float64(c.samples))
 	glog.Infof("int64Deltas: %d (%.1f%%)", c.int64Deltas, 100*float64(c.int64Deltas)/float64(c.samples))
+	glog.Infof("deltaTimeBytes: %d (%.1f% per sample)", c.deltaTimeBytes, float64(c.deltaTimeBytes)/float64(c.samples))
+	glog.Infof("deltaValueBytes: %d (%.1f% per sample)", c.deltaValueBytes, float64(c.deltaValueBytes)/float64(c.samples))
+	glog.Infof("deltaBytes: %d (%.1f%%)", c.deltaValueBytes+c.deltaTimeBytes, 100*float64(c.deltaTimeBytes+c.deltaValueBytes)/float64(c.uncompressedBytes))
 	glog.Infof("Total: %d (100%%)", c.uncompressedBytes)
 	for algo, _ := range c.compressors {
 		glog.Infof("%s: %d (%.1f%%)", algo, c.compressedBytes[algo], 100*float64(c.compressedBytes[algo])/float64(c.uncompressedBytes))
