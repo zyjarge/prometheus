@@ -31,7 +31,7 @@ import (
 	"github.com/prometheus/prometheus/notification"
 	"github.com/prometheus/prometheus/retrieval"
 	"github.com/prometheus/prometheus/rules/manager"
-	"github.com/prometheus/prometheus/storage/metric/tiered"
+	"github.com/prometheus/prometheus/storage/metric/ng"
 	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/prometheus/prometheus/storage/remote/opentsdb"
 	"github.com/prometheus/prometheus/web"
@@ -54,10 +54,6 @@ var (
 	diskAppendQueueCapacity   = flag.Int("storage.queue.diskAppendCapacity", 1000000, "The size of the queue for items that are pending writing to disk.")
 	memoryAppendQueueCapacity = flag.Int("storage.queue.memoryAppendCapacity", 10000, "The size of the queue for items that are pending writing to memory.")
 
-	compactInterval         = flag.Duration("compact.interval", 3*time.Hour, "The amount of time between compactions.")
-	compactGroupSize        = flag.Int("compact.groupSize", 500, "The minimum group size for compacted samples.")
-	compactAgeInclusiveness = flag.Duration("compact.ageInclusiveness", 5*time.Minute, "The age beyond which samples should be compacted.")
-
 	deleteInterval = flag.Duration("delete.interval", 11*time.Hour, "The amount of time between deletion of old values.")
 
 	deleteAge = flag.Duration("delete.ageMaximum", 15*24*time.Hour, "The relative maximum age for values before they are deleted.")
@@ -75,21 +71,13 @@ var (
 )
 
 type prometheus struct {
-	compactionTimer *time.Ticker
-	deletionTimer   *time.Ticker
-
-	curationSema             chan struct{}
-	stopBackgroundOperations chan struct{}
-
 	unwrittenSamples chan *extraction.Result
 
 	ruleManager     manager.RuleManager
 	targetManager   retrieval.TargetManager
 	notifications   chan notification.NotificationReqs
-	storage         *tiered.TieredStorage
+	storage         storage_ng.Storage
 	remoteTSDBQueue *remote.TSDBQueueManager
-
-	curationState tiered.CurationStateUpdater
 
 	closeOnce sync.Once
 }
@@ -107,73 +95,6 @@ func (p *prometheus) interruptHandler() {
 	os.Exit(0)
 }
 
-func (p *prometheus) compact(olderThan time.Duration, groupSize int) error {
-	select {
-	case s, ok := <-p.curationSema:
-		if !ok {
-			glog.Warning("Prometheus is shutting down; no more curation runs are allowed.")
-			return nil
-		}
-
-		defer func() {
-			p.curationSema <- s
-		}()
-
-	default:
-		glog.Warningf("Deferred compaction for %s and %s due to existing operation.", olderThan, groupSize)
-
-		return nil
-	}
-
-	processor := tiered.NewCompactionProcessor(&tiered.CompactionProcessorOptions{
-		MaximumMutationPoolBatch: groupSize * 3,
-		MinimumGroupSize:         groupSize,
-	})
-	defer processor.Close()
-
-	curator := tiered.NewCurator(&tiered.CuratorOptions{
-		Stop: p.stopBackgroundOperations,
-
-		ViewQueue: p.storage.ViewQueue,
-	})
-	defer curator.Close()
-
-	return curator.Run(olderThan, clientmodel.Now(), processor, p.storage.DiskStorage.CurationRemarks, p.storage.DiskStorage.MetricSamples, p.storage.DiskStorage.MetricHighWatermarks, p.curationState)
-}
-
-func (p *prometheus) delete(olderThan time.Duration, batchSize int) error {
-	select {
-	case s, ok := <-p.curationSema:
-		if !ok {
-			glog.Warning("Prometheus is shutting down; no more curation runs are allowed.")
-			return nil
-		}
-
-		defer func() {
-			p.curationSema <- s
-		}()
-
-	default:
-		glog.Warningf("Deferred deletion for %s due to existing operation.", olderThan)
-
-		return nil
-	}
-
-	processor := tiered.NewDeletionProcessor(&tiered.DeletionProcessorOptions{
-		MaximumMutationPoolBatch: batchSize,
-	})
-	defer processor.Close()
-
-	curator := tiered.NewCurator(&tiered.CuratorOptions{
-		Stop: p.stopBackgroundOperations,
-
-		ViewQueue: p.storage.ViewQueue,
-	})
-	defer curator.Close()
-
-	return curator.Run(olderThan, clientmodel.Now(), processor, p.storage.DiskStorage.CurationRemarks, p.storage.DiskStorage.MetricSamples, p.storage.DiskStorage.MetricHighWatermarks, p.curationState)
-}
-
 func (p *prometheus) Close() {
 	p.closeOnce.Do(p.close)
 }
@@ -186,22 +107,6 @@ func (p *prometheus) close() {
 	glog.Info("Remote Target Manager: Done")
 	p.ruleManager.Stop()
 	glog.Info("Rule Executor: Done")
-
-	// Stop any currently active curation (deletion or compaction).
-	close(p.stopBackgroundOperations)
-	glog.Info("Current Curation Workers: Requested")
-
-	// Disallow further curation work.
-	close(p.curationSema)
-
-	// Stop curation timers.
-	if p.compactionTimer != nil {
-		p.compactionTimer.Stop()
-	}
-	if p.deletionTimer != nil {
-		p.deletionTimer.Stop()
-	}
-	glog.Info("Future Curation Workers: Done")
 
 	glog.Infof("Waiting %s for background systems to exit and flush before finalizing (DO NOT INTERRUPT THE PROCESS) ...", *shutdownTimeout)
 
@@ -241,11 +146,12 @@ func main() {
 		glog.Fatalf("Error loading configuration from %s: %v", *configFile, err)
 	}
 
-	ts, err := tiered.NewTieredStorage(uint(*diskAppendQueueCapacity), 100, *arenaFlushInterval, *arenaTTL, *metricsStoragePath)
+	persistence, err := storage_ng.NewDiskPersistence(*metricsStoragePath)
 	if err != nil {
-		glog.Fatal("Error opening storage: ", err)
+		glog.Fatal("Error opening disk persistence: ", err)
 	}
-	registry.MustRegister(ts)
+	memStorage := storage_ng.NewMemorySeriesStorage(persistence)
+	//registry.MustRegister(memStorage)
 
 	var remoteTSDBQueue *remote.TSDBQueueManager
 	if *remoteTSDBUrl == "" {
@@ -265,9 +171,6 @@ func main() {
 		Ingester: retrieval.ChannelIngester(unwrittenSamples),
 	}
 
-	compactionTimer := time.NewTicker(*compactInterval)
-	deletionTimer := time.NewTicker(*deleteInterval)
-
 	// Queue depth will need to be exposed
 	targetManager := retrieval.NewTargetManager(ingester, *concurrentRetrievalAllowance)
 	targetManager.AddTargetsFromConfig(conf)
@@ -279,7 +182,7 @@ func main() {
 		Results:            unwrittenSamples,
 		Notifications:      notifications,
 		EvaluationInterval: conf.EvaluationInterval(),
-		Storage:            ts,
+		Storage:            memStorage,
 		PrometheusUrl:      web.MustBuildServerUrl(),
 	})
 	if err := ruleManager.AddRulesFromConfig(conf); err != nil {
@@ -311,36 +214,27 @@ func main() {
 	}
 
 	consolesHandler := &web.ConsolesHandler{
-		Storage: ts,
+		Storage: memStorage,
 	}
 
 	databasesHandler := &web.DatabasesHandler{
-		Provider:        ts.DiskStorage,
+		Provider:        nil,
 		RefreshInterval: 5 * time.Minute,
 	}
 
 	metricsService := &api.MetricsService{
 		Config:        &conf,
 		TargetManager: targetManager,
-		Storage:       ts,
+		Storage:       memStorage,
 	}
 
 	prometheus := &prometheus{
-		compactionTimer: compactionTimer,
-
-		deletionTimer: deletionTimer,
-
-		curationState: prometheusStatus,
-		curationSema:  make(chan struct{}, 1),
-
 		unwrittenSamples: unwrittenSamples,
-
-		stopBackgroundOperations: make(chan struct{}),
 
 		ruleManager:     ruleManager,
 		targetManager:   targetManager,
 		notifications:   notifications,
-		storage:         ts,
+		storage:         memStorage,
 		remoteTSDBQueue: remoteTSDBQueue,
 	}
 	defer prometheus.Close()
@@ -355,37 +249,14 @@ func main() {
 		QuitDelegate: prometheus.Close,
 	}
 
-	prometheus.curationSema <- struct{}{}
-
+	/* TODO: implement serving storage.
 	storageStarted := make(chan bool)
 	go ts.Serve(storageStarted)
 	<-storageStarted
+	*/
+	go memStorage.Serve()
 
 	go prometheus.interruptHandler()
-
-	go func() {
-		for _ = range prometheus.compactionTimer.C {
-			glog.Info("Starting compaction...")
-			err := prometheus.compact(*compactAgeInclusiveness, *compactGroupSize)
-
-			if err != nil {
-				glog.Error("could not compact: ", err)
-			}
-			glog.Info("Done")
-		}
-	}()
-
-	go func() {
-		for _ = range prometheus.deletionTimer.C {
-			glog.Info("Starting deletion of stale values...")
-			err := prometheus.delete(*deleteAge, deletionBatchSize)
-
-			if err != nil {
-				glog.Error("could not delete: ", err)
-			}
-			glog.Info("Done")
-		}
-	}()
 
 	go func() {
 		err := webService.ServeForever()
@@ -397,7 +268,7 @@ func main() {
 	// TODO(all): Migrate this into prometheus.serve().
 	for block := range unwrittenSamples {
 		if block.Err == nil && len(block.Samples) > 0 {
-			ts.AppendSamples(block.Samples)
+			memStorage.AppendSamples(block.Samples)
 			if remoteTSDBQueue != nil {
 				remoteTSDBQueue.Queue(block.Samples)
 			}

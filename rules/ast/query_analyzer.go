@@ -16,12 +16,10 @@ package ast
 import (
 	"time"
 
-	"github.com/golang/glog"
-
 	clientmodel "github.com/prometheus/client_golang/model"
 
 	"github.com/prometheus/prometheus/stats"
-	"github.com/prometheus/prometheus/storage/metric"
+	"github.com/prometheus/prometheus/storage/metric/ng"
 )
 
 // FullRangeMap maps the fingerprint of a full range to the duration
@@ -48,13 +46,13 @@ type QueryAnalyzer struct {
 	IntervalRanges IntervalRangeMap
 	// The underlying storage to which the query will be applied. Needed for
 	// extracting timeseries fingerprint information during query analysis.
-	storage metric.Persistence
+	storage storage_ng.Storage
 }
 
 // NewQueryAnalyzer returns a pointer to a newly instantiated
 // QueryAnalyzer. The storage is needed to extract timeseries
 // fingerprint information during query analysis.
-func NewQueryAnalyzer(storage metric.Persistence) *QueryAnalyzer {
+func NewQueryAnalyzer(storage storage_ng.Storage) *QueryAnalyzer {
 	return &QueryAnalyzer{
 		FullRanges:     FullRangeMap{},
 		IntervalRanges: IntervalRangeMap{},
@@ -66,11 +64,7 @@ func NewQueryAnalyzer(storage metric.Persistence) *QueryAnalyzer {
 func (analyzer *QueryAnalyzer) Visit(node Node) {
 	switch n := node.(type) {
 	case *VectorSelector:
-		fingerprints, err := analyzer.storage.GetFingerprintsForLabelMatchers(n.labelMatchers)
-		if err != nil {
-			glog.Errorf("Error getting fingerprints for label matchers %v: %v", n.labelMatchers, err)
-			return
-		}
+		fingerprints := analyzer.storage.GetFingerprintsForLabelMatchers(n.labelMatchers)
 		n.fingerprints = fingerprints
 		for _, fingerprint := range fingerprints {
 			// Only add the fingerprint to IntervalRanges if not yet present in FullRanges.
@@ -78,13 +72,12 @@ func (analyzer *QueryAnalyzer) Visit(node Node) {
 			if _, alreadyInFullRanges := analyzer.FullRanges[*fingerprint]; !alreadyInFullRanges {
 				analyzer.IntervalRanges[*fingerprint] = true
 			}
+
+			n.iterators[*fingerprint] = analyzer.storage.NewIterator(fingerprint)
+			n.metrics[*fingerprint] = analyzer.storage.GetMetricForFingerprint(fingerprint)
 		}
 	case *MatrixSelector:
-		fingerprints, err := analyzer.storage.GetFingerprintsForLabelMatchers(n.labelMatchers)
-		if err != nil {
-			glog.Errorf("Error getting fingerprints for label matchers %v: %v", n.labelMatchers, err)
-			return
-		}
+		fingerprints := analyzer.storage.GetFingerprintsForLabelMatchers(n.labelMatchers)
 		n.fingerprints = fingerprints
 		for _, fingerprint := range fingerprints {
 			if analyzer.FullRanges[*fingerprint] < n.interval {
@@ -94,6 +87,9 @@ func (analyzer *QueryAnalyzer) Visit(node Node) {
 				// an interval range for the same fingerprint, should we have one.
 				delete(analyzer.IntervalRanges, *fingerprint)
 			}
+
+			n.iterators[*fingerprint] = analyzer.storage.NewIterator(fingerprint)
+			n.metrics[*fingerprint] = analyzer.storage.GetMetricForFingerprint(fingerprint)
 		}
 	}
 }
@@ -104,12 +100,13 @@ func (analyzer *QueryAnalyzer) AnalyzeQueries(node Node) {
 	Walk(analyzer, node)
 }
 
-func viewAdapterForInstantQuery(node Node, timestamp clientmodel.Timestamp, storage metric.PreloadingPersistence, queryStats *stats.TimerGroup) (*viewAdapter, error) {
+func prepareInstantQuery(node Node, timestamp clientmodel.Timestamp, storage storage_ng.Storage, queryStats *stats.TimerGroup) (storage_ng.Closer, error) {
 	analyzeTimer := queryStats.GetTimer(stats.QueryAnalysisTime).Start()
 	analyzer := NewQueryAnalyzer(storage)
 	analyzer.AnalyzeQueries(node)
 	analyzeTimer.Stop()
 
+	/* TODO: convert to NG storage builder.
 	requestBuildTimer := queryStats.GetTimer(stats.ViewRequestBuildTime).Start()
 	viewBuilder := storage.NewViewRequestBuilder()
 	for fingerprint, rangeDuration := range analyzer.FullRanges {
@@ -127,14 +124,17 @@ func viewAdapterForInstantQuery(node Node, timestamp clientmodel.Timestamp, stor
 		return nil, err
 	}
 	return NewViewAdapter(view, storage, queryStats), nil
+	*/
+	return storage_ng.NopCloser{}, nil
 }
 
-func viewAdapterForRangeQuery(node Node, start clientmodel.Timestamp, end clientmodel.Timestamp, interval time.Duration, storage metric.PreloadingPersistence, queryStats *stats.TimerGroup) (*viewAdapter, error) {
+func prepareRangeQuery(node Node, start clientmodel.Timestamp, end clientmodel.Timestamp, interval time.Duration, storage storage_ng.Storage, queryStats *stats.TimerGroup) (storage_ng.Closer, error) {
 	analyzeTimer := queryStats.GetTimer(stats.QueryAnalysisTime).Start()
 	analyzer := NewQueryAnalyzer(storage)
 	analyzer.AnalyzeQueries(node)
 	analyzeTimer.Stop()
 
+	/* TODO: convert to NG storage builder.
 	requestBuildTimer := queryStats.GetTimer(stats.ViewRequestBuildTime).Start()
 	viewBuilder := storage.NewViewRequestBuilder()
 	for fingerprint, rangeDuration := range analyzer.FullRanges {
@@ -156,4 +156,6 @@ func viewAdapterForRangeQuery(node Node, start clientmodel.Timestamp, end client
 		return nil, err
 	}
 	return NewViewAdapter(view, storage, queryStats), nil
+	*/
+	return storage_ng.NopCloser{}, nil
 }

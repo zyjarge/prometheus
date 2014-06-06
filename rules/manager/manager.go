@@ -27,7 +27,7 @@ import (
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/notification"
 	"github.com/prometheus/prometheus/rules"
-	"github.com/prometheus/prometheus/storage/metric"
+	"github.com/prometheus/prometheus/storage/metric/ng"
 	"github.com/prometheus/prometheus/templates"
 )
 
@@ -83,7 +83,7 @@ type ruleManager struct {
 	done chan bool
 
 	interval time.Duration
-	storage  metric.PreloadingPersistence
+	storage  storage_ng.Storage
 
 	results       chan<- *extraction.Result
 	notifications chan<- notification.NotificationReqs
@@ -93,7 +93,7 @@ type ruleManager struct {
 
 type RuleManagerOptions struct {
 	EvaluationInterval time.Duration
-	Storage            metric.PreloadingPersistence
+	Storage            storage_ng.Storage
 
 	Notifications chan<- notification.NotificationReqs
 	Results       chan<- *extraction.Result

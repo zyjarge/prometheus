@@ -20,6 +20,7 @@ import (
 
 	"github.com/prometheus/prometheus/rules/ast"
 	"github.com/prometheus/prometheus/storage/metric"
+	"github.com/prometheus/prometheus/storage/metric/ng"
 )
 
 var testSampleInterval = time.Duration(5) * time.Minute
@@ -51,7 +52,7 @@ func getTestVectorFromTestMatrix(matrix ast.Matrix) ast.Vector {
 	return vector
 }
 
-func storeMatrix(storage metric.Persistence, matrix ast.Matrix) (err error) {
+func storeMatrix(storage storage_ng.Storage, matrix ast.Matrix) (err error) {
 	pendingSamples := clientmodel.Samples{}
 	for _, sampleSet := range matrix {
 		for _, sample := range sampleSet.Values {
