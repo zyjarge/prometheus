@@ -108,7 +108,11 @@ func NewLevelDB(basePath string) *LevelDB {
 	opts := levigo.NewOptions()
 	opts.SetCache(levigo.NewLRUCache(50 * 1024 * 1024))
 	opts.SetCreateIfMissing(true)
-	opts.SetCompression(levigo.SnappyCompression)
+	if *disableCompression {
+		opts.SetCompression(levigo.NoCompression)
+	} else {
+		opts.SetCompression(levigo.SnappyCompression)
+	}
 	db, err := levigo.Open(basePath, opts)
 	if err != nil {
 		panic(err)
