@@ -9,7 +9,7 @@ import (
 )
 
 type TestDB interface {
-	CreateKey(key string, value []byte)
+	CreateKey(key string, value []byte, appendValue bool)
 	Seek(key string, read bool)
 	Close()
 	Prune()
@@ -18,7 +18,7 @@ type TestDB interface {
 // FILES DB
 type FilesDB struct {
 	basePath string
-	buf []byte
+	buf      []byte
 }
 
 func NewFilesDB(basePath string) *FilesDB {
@@ -26,9 +26,9 @@ func NewFilesDB(basePath string) *FilesDB {
 	if err != nil {
 		panic(err)
 	}
-	return &FilesDB {
+	return &FilesDB{
 		basePath: basePath,
-		buf: make([]byte, 4096),
+		buf:      make([]byte, 4096),
 	}
 }
 
@@ -38,13 +38,17 @@ func (f *FilesDB) keyToFile(key string) string {
 
 // exists returns whether the given file or directory exists or not
 func exists(path string) bool {
-    _, err := os.Stat(path)
-    if err == nil { return true }
-    if os.IsNotExist(err) { return false }
-    panic(err)
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	panic(err)
 }
 
-func (f *FilesDB) CreateKey(key string, value []byte) {
+func (f *FilesDB) CreateKey(key string, value []byte, appendValue bool) {
 	filename := f.keyToFile(key)
 	if !exists(path.Dir(filename)) {
 		err := os.MkdirAll(path.Dir(filename), 0700)
@@ -52,7 +56,13 @@ func (f *FilesDB) CreateKey(key string, value []byte) {
 			panic(err)
 		}
 	}
-	file, err := os.Create(filename)
+	var file *os.File
+	var err error
+	if appendValue {
+		file, err = os.OpenFile(filename, os.O_RDWR|os.O_APPEND, 0660)
+	} else {
+		file, err = os.Create(filename)
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -87,10 +97,10 @@ func (f *FilesDB) Prune() {}
 
 // LEVELDB
 type LevelDB struct {
-	it *levigo.Iterator
-	db *levigo.DB
-	wo *levigo.WriteOptions
-	wb *levigo.WriteBatch
+	it    *levigo.Iterator
+	db    *levigo.DB
+	wo    *levigo.WriteOptions
+	wb    *levigo.WriteBatch
 	bsize int
 }
 
@@ -130,7 +140,10 @@ func (l *LevelDB) Flush() {
 	l.bsize = 0
 }
 
-func (l *LevelDB) CreateKey(key string, value []byte) {
+func (l *LevelDB) CreateKey(key string, value []byte, appendValue bool) {
+	if appendValue {
+		panic("appending to values not supported for LevelDB")
+	}
 	l.wb.Put([]byte(key), value)
 	l.bsize++
 	if l.bsize > 4096 {

@@ -14,44 +14,44 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"time"
-	"flag"
 )
 
 var (
-	useFiles = flag.Bool("useFiles", false, "Whether to use the files DB or LevelDB")
-	doPopulate = flag.Bool("doPopulate", false, "Whether to populate the database")
-	totalKeys = flag.Int("totalKeys", 100000, "The number of keys to populate")
-	seekKeys = flag.Int("seekKeys", 10, "The number of keys to query for")
-	keySize = flag.Int("keySize", 100, "The size of each key in bytes")
-	valueSize = flag.Int("valueSize", 32 * 1024, "The size of each value in bytes")
-	doSeek = flag.Bool("doSeek", false, "Whether to do the seek test")
-	doRead = flag.Bool("doRead", false, "Whether to read the values while doing the seek test")
-	doPrune = flag.Bool("doPrune", false, "Whether to compact the database")
+	useFiles     = flag.Bool("useFiles", false, "Whether to use the files DB or LevelDB")
+	doPopulate   = flag.Bool("doPopulate", false, "Whether to populate the database")
+	totalKeys    = flag.Int("totalKeys", 100000, "The number of keys to populate")
+	seekKeys     = flag.Int("seekKeys", 10, "The number of keys to query for")
+	keySize      = flag.Int("keySize", 100, "The size of each key in bytes")
+	valueSize    = flag.Int("valueSize", 32*1024, "The size of each value in bytes")
+	appendValues = flag.Bool("appendValues", false, "Whether to create/replace or append to values.")
+	doSeek       = flag.Bool("doSeek", false, "Whether to do the seek test")
+	doRead       = flag.Bool("doRead", false, "Whether to read the values while doing the seek test")
+	doPrune      = flag.Bool("doPrune", false, "Whether to compact the database")
 
 	levelDBBasePath = flag.String("levelDBBasePath", "/srv/dbbench/leveldb", "The root path for the LevelDB-based storage")
-	filesBasePath = flag.String("filesBasePath", "/srv/dbbench/files", "The root path for the files-based storage")
+	filesBasePath   = flag.String("filesBasePath", "/srv/dbbench/files", "The root path for the files-based storage")
 )
 
-
 type randomDataMaker struct {
-		src rand.Source
+	src rand.Source
 }
 
 func (r *randomDataMaker) Read(p []byte) (n int, err error) {
-		for i := range p {
-				p[i] = byte(r.src.Int63() & 0xff)
-		}
-		return len(p), nil
+	for i := range p {
+		p[i] = byte(r.src.Int63() & 0xff)
+	}
+	return len(p), nil
 }
 
 func keyFromInt(i int) string {
-	key := fmt.Sprintf("%0" + fmt.Sprintf("%d", *keySize) + "d", i)
+	key := fmt.Sprintf("%0"+fmt.Sprintf("%d", *keySize)+"d", i)
 	rKey := []byte(key)
 	for i := 0; i < len(rKey); i++ {
-		rKey[i] = key[len(key)-1 - i]
+		rKey[i] = key[len(key)-1-i]
 	}
 	return string(rKey)
 }
@@ -66,7 +66,7 @@ func populate(db TestDB) {
 		if n != *valueSize || err != nil {
 			panic("")
 		}
-		db.CreateKey(keyFromInt(i), value)
+		db.CreateKey(keyFromInt(i), value, *appendValues)
 	}
 }
 
@@ -93,7 +93,7 @@ func main() {
 		fmt.Println("Starting DB population...")
 		start := time.Now()
 		populate(db)
-		fmt.Println("BENCH_RESULT:", time.Since(start) / time.Duration(*totalKeys))
+		fmt.Println("BENCH_RESULT:", time.Since(start)/time.Duration(*totalKeys))
 		fmt.Println("Total time:", time.Since(start))
 	}
 
@@ -101,7 +101,7 @@ func main() {
 		fmt.Println("Starting seek test...")
 		start := time.Now()
 		seekTest(db)
-		fmt.Println("BENCH_RESULT:", time.Since(start) / time.Duration(*seekKeys))
+		fmt.Println("BENCH_RESULT:", time.Since(start)/time.Duration(*seekKeys))
 		fmt.Println("Total time:", time.Since(start))
 	}
 
