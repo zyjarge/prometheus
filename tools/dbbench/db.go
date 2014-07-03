@@ -33,7 +33,8 @@ func NewFilesDB(basePath string) *FilesDB {
 }
 
 func (f *FilesDB) keyToFile(key string) string {
-	return fmt.Sprintf("%s/%c%c/%c%c/%s", *filesBasePath, key[0], key[1], key[2], key[3], key[4:])
+//	return fmt.Sprintf("%s/%c%c/%c%c/%s", *filesBasePath, key[0], key[1], key[2], key[3], key[4:])
+	return fmt.Sprintf("%s/%c%c/%s", *filesBasePath, key[0], key[1], key[2:])
 }
 
 // exists returns whether the given file or directory exists or not

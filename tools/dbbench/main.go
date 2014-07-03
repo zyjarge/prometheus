@@ -63,6 +63,9 @@ func populate(db TestDB) {
 	randMaker := randomDataMaker{src: src}
 
 	for i := 0; i < *totalKeys; i++ {
+		if i % 10000 == 0 {
+			fmt.Println("Key", i)
+		}
 		n, err := randMaker.Read(value)
 		if n != *valueSize || err != nil {
 			panic("")
