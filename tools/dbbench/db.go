@@ -5,7 +5,13 @@ import (
 	"os"
 	"path"
 
+	"github.com/boltdb/bolt"
 	"github.com/jmhodges/levigo"
+	"github.com/syndtr/goleveldb/leveldb"
+	leveldb_cache "github.com/syndtr/goleveldb/leveldb/cache"
+	leveldb_it "github.com/syndtr/goleveldb/leveldb/iterator"
+	leveldb_opt "github.com/syndtr/goleveldb/leveldb/opt"
+	leveldb_util "github.com/syndtr/goleveldb/leveldb/util"
 )
 
 type TestDB interface {
@@ -33,8 +39,8 @@ func NewFilesDB(basePath string) *FilesDB {
 }
 
 func (f *FilesDB) keyToFile(key string) string {
-//	return fmt.Sprintf("%s/%c%c/%c%c/%s", *filesBasePath, key[0], key[1], key[2], key[3], key[4:])
-	return fmt.Sprintf("%s/%c%c/%s", *filesBasePath, key[0], key[1], key[2:])
+	//	return fmt.Sprintf("%s/%c%c/%c%c/%s", f.basePath, key[0], key[1], key[2], key[3], key[4:])
+	return fmt.Sprintf("%s/%c%c/%s", f.basePath, key[0], key[1], key[2:])
 }
 
 // exists returns whether the given file or directory exists or not
@@ -96,8 +102,8 @@ func (f *FilesDB) Seek(key string, read bool) {
 func (f *FilesDB) Close() {}
 func (f *FilesDB) Prune() {}
 
-// LEVELDB
-type LevelDB struct {
+// CGO LEVELDB
+type CLevelDB struct {
 	it    *levigo.Iterator
 	db    *levigo.DB
 	wo    *levigo.WriteOptions
@@ -105,7 +111,7 @@ type LevelDB struct {
 	bsize int
 }
 
-func NewLevelDB(basePath string) *LevelDB {
+func NewCLevelDB(basePath string) *CLevelDB {
 	opts := levigo.NewOptions()
 	opts.SetCache(levigo.NewLRUCache(50 * 1024 * 1024))
 	opts.SetCreateIfMissing(true)
@@ -128,7 +134,7 @@ func NewLevelDB(basePath string) *LevelDB {
 	fmt.Println("Done.")
 	ro.SetSnapshot(snapshot)
 
-	return &LevelDB{
+	return &CLevelDB{
 		it: db.NewIterator(ro),
 		db: db,
 		wo: levigo.NewWriteOptions(),
@@ -136,7 +142,7 @@ func NewLevelDB(basePath string) *LevelDB {
 	}
 }
 
-func (l *LevelDB) Flush() {
+func (l *CLevelDB) Flush() {
 	if err := l.db.Write(l.wo, l.wb); err != nil {
 		panic(err)
 	}
@@ -145,9 +151,9 @@ func (l *LevelDB) Flush() {
 	l.bsize = 0
 }
 
-func (l *LevelDB) CreateKey(key string, value []byte, appendValue bool) {
+func (l *CLevelDB) CreateKey(key string, value []byte, appendValue bool) {
 	if appendValue {
-		panic("appending to values not supported for LevelDB")
+		panic("appending to values not supported for CLevelDB")
 	}
 	l.wb.Put([]byte(key), value)
 	l.bsize++
@@ -156,7 +162,7 @@ func (l *LevelDB) CreateKey(key string, value []byte, appendValue bool) {
 	}
 }
 
-func (l *LevelDB) Seek(key string, read bool) {
+func (l *CLevelDB) Seek(key string, read bool) {
 	l.it.Seek([]byte(key))
 	if !l.it.Valid() {
 		panic("iterator invalid")
@@ -166,7 +172,7 @@ func (l *LevelDB) Seek(key string, read bool) {
 	}
 }
 
-func (l *LevelDB) Prune() {
+func (l *CLevelDB) Prune() {
 	// Magic values per https://code.google.com/p/leveldb/source/browse/include/leveldb/db.h#131.
 	keyspace := levigo.Range{
 		Start: nil,
@@ -176,8 +182,178 @@ func (l *LevelDB) Prune() {
 	l.db.CompactRange(keyspace)
 }
 
-func (l *LevelDB) Close() {
+func (l *CLevelDB) Close() {
 	l.Flush()
 	l.it.Close()
 	l.db.Close()
+}
+
+// Native LEVELDB
+type GoLevelDB struct {
+	it    leveldb_it.Iterator
+	db    *leveldb.DB
+	wo    *leveldb_opt.WriteOptions
+	wb    *leveldb.Batch
+	bsize int
+}
+
+func NewGoLevelDB(basePath string) *GoLevelDB {
+	var comp leveldb_opt.Compression
+	if *disableCompression {
+		comp = leveldb_opt.NoCompression
+	} else {
+		comp = leveldb_opt.SnappyCompression
+	}
+	opts := &leveldb_opt.Options{
+		BlockCache:  leveldb_cache.NewLRUCache(50 * 1024 * 1024),
+		Compression: comp,
+	}
+	db, err := leveldb.OpenFile(basePath, opts)
+	if err != nil {
+		panic(err)
+	}
+	if db == nil {
+		panic(db)
+	}
+
+	snapshot, err := db.GetSnapshot()
+
+	return &GoLevelDB{
+		it: snapshot.NewIterator(nil, &leveldb_opt.ReadOptions{}),
+		db: db,
+		wo: &leveldb_opt.WriteOptions{},
+		wb: &leveldb.Batch{},
+	}
+}
+
+func (l *GoLevelDB) Flush() {
+	if err := l.db.Write(l.wb, l.wo); err != nil {
+		panic(err)
+	}
+	l.wb.Reset()
+	l.bsize = 0
+}
+
+func (l *GoLevelDB) CreateKey(key string, value []byte, appendValue bool) {
+	if appendValue {
+		panic("appending to values not supported for GoLevelDB")
+	}
+	l.wb.Put([]byte(key), value)
+	l.bsize++
+	if l.bsize > 4096 {
+		l.Flush()
+	}
+}
+
+func (l *GoLevelDB) Seek(key string, read bool) {
+	if !l.it.Seek([]byte(key)) {
+		panic("key does not exist")
+	}
+	if read {
+		l.it.Value()
+	}
+}
+
+func (l *GoLevelDB) Prune() {
+	keyspace := leveldb_util.Range{
+		Start: nil,
+		Limit: nil,
+	}
+
+	if err := l.db.CompactRange(keyspace); err != nil {
+		panic(err)
+	}
+}
+
+func (l *GoLevelDB) Close() {
+	l.Flush()
+	l.it.Release()
+	l.db.Close()
+}
+
+// BoltDB
+var boltBucket = []byte("index")
+
+type keyValuePair struct {
+	key   []byte
+	value []byte
+}
+
+type BoltDB struct {
+	db   *bolt.DB
+	kvps []keyValuePair
+}
+
+func NewBoltDB(basePath string) *BoltDB {
+	db, err := bolt.Open(basePath+"/bolt.db", 0600, nil)
+	if err != nil {
+		panic(err)
+	}
+	db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists(boltBucket)
+		return err
+	})
+	return &BoltDB{
+		db:   db,
+		kvps: make([]keyValuePair, 0, 4096),
+	}
+}
+
+func (b *BoltDB) CreateKey(key string, value []byte, appendValue bool) {
+	if appendValue {
+		panic("appending to values not supported for BoltDB")
+	}
+
+	b.kvps = append(b.kvps, keyValuePair{
+		key:   []byte(key),
+		value: value,
+	})
+
+	// Batch is full, write it out.
+	if len(b.kvps) == cap(b.kvps) {
+		b.Flush()
+	}
+}
+
+func (b *BoltDB) Flush() {
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(boltBucket)
+		if bucket == nil {
+			return fmt.Errorf("boltdb bucket not found")
+		}
+
+		for _, kvp := range b.kvps {
+			//err := bucket.Put(kvp.key, kvp.value)
+			err := bucket.Delete(kvp.key)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	b.kvps = b.kvps[:0]
+}
+
+func (b *BoltDB) Seek(key string, read bool) {
+	b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(boltBucket)
+		if bucket == nil {
+			return fmt.Errorf("boltdb bucket not found")
+		}
+		bucket.Get([]byte(key))
+		return nil
+	})
+}
+
+func (b *BoltDB) Prune() {
+}
+
+func (b *BoltDB) Close() {
+	b.Flush()
+	b.db.Close()
 }

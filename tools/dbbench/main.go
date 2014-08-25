@@ -21,7 +21,8 @@ import (
 )
 
 var (
-	useFiles           = flag.Bool("useFiles", false, "Whether to use the files DB or LevelDB")
+	dbType             = flag.String("dbType", "files", "DB type to use: 'files', 'levigo', 'goleveldb', 'boltdb'")
+	dbBasePath         = flag.String("dbBasePath", "/srv/dbbench/files", "The root path for the files-based storage")
 	doPopulate         = flag.Bool("doPopulate", false, "Whether to populate the database")
 	totalKeys          = flag.Int("totalKeys", 100000, "The number of keys to populate")
 	seekKeys           = flag.Int("seekKeys", 10, "The number of keys to query for")
@@ -32,9 +33,6 @@ var (
 	doRead             = flag.Bool("doRead", false, "Whether to read the values while doing the seek test")
 	doPrune            = flag.Bool("doPrune", false, "Whether to compact the database")
 	disableCompression = flag.Bool("disableCompression", false, "Disable LevelDB compression.")
-
-	levelDBBasePath = flag.String("levelDBBasePath", "/srv/dbbench/leveldb", "The root path for the LevelDB-based storage")
-	filesBasePath   = flag.String("filesBasePath", "/srv/dbbench/files", "The root path for the files-based storage")
 )
 
 type randomDataMaker struct {
@@ -63,7 +61,7 @@ func populate(db TestDB) {
 	randMaker := randomDataMaker{src: src}
 
 	for i := 0; i < *totalKeys; i++ {
-		if i % 10000 == 0 {
+		if i%10000 == 0 {
 			fmt.Println("Key", i)
 		}
 		n, err := randMaker.Read(value)
@@ -86,10 +84,17 @@ func main() {
 	rand.Seed(time.Now().Unix())
 
 	var db TestDB
-	if *useFiles {
-		db = NewFilesDB(*filesBasePath)
-	} else {
-		db = NewLevelDB(*levelDBBasePath)
+	switch *dbType {
+	case "files":
+		db = NewFilesDB(*dbBasePath)
+	case "levigo":
+		db = NewCLevelDB(*dbBasePath)
+	case "goleveldb":
+		db = NewGoLevelDB(*dbBasePath)
+	case "boltdb":
+		db = NewBoltDB(*dbBasePath)
+	default:
+		panic("unknown db type")
 	}
 	defer db.Close()
 
