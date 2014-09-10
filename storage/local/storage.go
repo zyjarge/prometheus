@@ -7,7 +7,6 @@ import (
 	"github.com/golang/glog"
 
 	clientmodel "github.com/prometheus/client_golang/model"
-
 	"github.com/prometheus/prometheus/storage/metric"
 	"github.com/prometheus/prometheus/utility"
 )
@@ -29,10 +28,7 @@ type memorySeriesStorage struct {
 	persistDone chan bool
 	stopServing chan chan<- bool
 
-	// TODO: These have to go to persistence.
-	fingerprintToSeries     map[clientmodel.Fingerprint]*memorySeries
-	labelPairToFingerprints map[metric.LabelPair]utility.Set
-	labelNameToLabelValues  map[clientmodel.LabelName]utility.Set
+	fingerprintToSeries SeriesMap
 
 	memoryEvictionInterval time.Duration
 	memoryRetentionPeriod  time.Duration
@@ -52,21 +48,18 @@ type MemorySeriesStorageOptions struct {
 	PersistenceRetentionPeriod time.Duration
 }
 
-func NewMemorySeriesStorage(o *MemorySeriesStorageOptions) (*memorySeriesStorage, error) { // TODO: change to return Storage?
-	glog.Info("Loading series head chunks...")
-	/*
-			if err := o.Persistence.LoadHeads(i.FingerprintToSeries); err != nil {
-				return nil, err
-			}
-		numSeries.Set(float64(len(i.FingerprintToSeries)))
-	*/
-	return &memorySeriesStorage{
-		fingerprintToSeries:     map[clientmodel.Fingerprint]*memorySeries{},
-		labelPairToFingerprints: map[metric.LabelPair]utility.Set{},
-		labelNameToLabelValues:  map[clientmodel.LabelName]utility.Set{},
+func NewMemorySeriesStorage(o *MemorySeriesStorageOptions) (Storage, error) {
+	glog.Info("Loading series map and head chunks...")
+	fingerprintToSeries, err := o.Persistence.LoadSeriesMapAndHeads()
+	if err != nil {
+		return nil, err
+	}
+	numSeries.Set(float64(len(fingerprintToSeries)))
 
-		persistDone: make(chan bool),
-		stopServing: make(chan chan<- bool),
+	return &memorySeriesStorage{
+		fingerprintToSeries: fingerprintToSeries,
+		persistDone:         make(chan bool),
+		stopServing:         make(chan chan<- bool),
 
 		memoryEvictionInterval: o.MemoryEvictionInterval,
 		memoryRetentionPeriod:  o.MemoryRetentionPeriod,
@@ -234,23 +227,18 @@ func (s *memorySeriesStorage) Close() error {
 	glog.Info("Persist loop stopped.")
 
 	glog.Info("Persisting head chunks...")
-	if err := s.persistHeads(); err != nil {
+	if err := s.persistence.PersistSeriesMapAndHeads(s.fingerprintToSeries); err != nil {
 		return err
 	}
 	glog.Info("Done persisting head chunks.")
 
-	for _, series := range s.fingerprintToSeries {
-		series.close()
-	}
 	s.fingerprintToSeries = nil
+	if err := s.persistence.Close(); err != nil {
+		return err
+	}
 
 	s.state = storageStopping
-
 	return nil
-}
-
-func (s *memorySeriesStorage) persistHeads() error {
-	return s.persistence.PersistHeads(s.fingerprintToSeries)
 }
 
 func (s *memorySeriesStorage) purgePeriodically(stop <-chan bool) {
@@ -376,78 +364,62 @@ func (s *memorySeriesStorage) GetFingerprintsForLabelMatchers(labelMatchers metr
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
-	sets := []utility.Set{}
+	var result map[clientmodel.Fingerprint]struct{}
 	for _, matcher := range labelMatchers {
+		intersection := map[clientmodel.Fingerprint]struct{}{}
 		switch matcher.Type {
 		case metric.Equal:
-			set, ok := s.labelPairToFingerprints[metric.LabelPair{
-				Name:  matcher.Name,
-				Value: matcher.Value,
-			}]
-			if !ok {
+			fps := s.Persistence.GetFingerprintsForLabelPair(
+				metric.LabelPair{
+					Name:  matcher.Name,
+					Value: matcher.Value,
+				},
+			)
+			if len(fps) == 0 {
 				return nil
 			}
-			sets = append(sets, set)
+			for _, fp := range fps {
+				if _, ok := result[fp]; ok || result == nil {
+					intersection[fp] = struct{}{}
+				}
+			}
 		default:
-			values := s.getLabelValuesForLabelName(matcher.Name)
+			values := s.Persistence.GetLabelValuesForLabelName(matcher.Name)
 			matches := matcher.Filter(values)
 			if len(matches) == 0 {
 				return nil
 			}
-			set := utility.Set{}
 			for _, v := range matches {
-				subset, ok := s.labelPairToFingerprints[metric.LabelPair{
-					Name:  matcher.Name,
-					Value: v,
-				}]
-				if !ok {
-					return nil
-				}
-				for fp := range subset {
-					set.Add(fp)
+				for _, fp := range s.Persistence.GetFingerprintsForLabelPair(
+					metric.LabelPair{
+						Name:  matcher.Name,
+						Value: v,
+					},
+				) {
+					if _, ok := result[fp]; ok || result == nil {
+						intersection[fp] = struct{}{}
+					}
 				}
 			}
-			sets = append(sets, set)
 		}
+		if len(intersection) == 0 {
+			return nil
+		}
+		result = intersection
 	}
 
-	setCount := len(sets)
-	if setCount == 0 {
-		return nil
+	fps := make(clientmodel.Fingerprints, 0, len(result))
+	for fp := range result {
+		fps = append(fps, fp)
 	}
-
-	base := sets[0]
-	for i := 1; i < setCount; i++ {
-		base = base.Intersection(sets[i])
-	}
-
-	fingerprints := clientmodel.Fingerprints{}
-	for _, e := range base.Elements() {
-		fingerprints = append(fingerprints, e.(clientmodel.Fingerprint))
-	}
-
-	return fingerprints
+	return fps
 }
 
 func (s *memorySeriesStorage) GetLabelValuesForLabelName(labelName clientmodel.LabelName) clientmodel.LabelValues {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
-	return s.getLabelValuesForLabelName(labelName)
-}
-
-func (s *memorySeriesStorage) getLabelValuesForLabelName(labelName clientmodel.LabelName) clientmodel.LabelValues {
-	set, ok := s.labelNameToLabelValues[labelName]
-	if !ok {
-		return nil
-	}
-
-	values := make(clientmodel.LabelValues, 0, len(set))
-	for e := range set {
-		val := e.(clientmodel.LabelValue)
-		values = append(values, val)
-	}
-	return values
+	return s.Persistence.GetLabelValuesForLabelName(labelName)
 }
 
 func (s *memorySeriesStorage) GetMetricForFingerprint(fp clientmodel.Fingerprint) clientmodel.Metric {

@@ -100,8 +100,11 @@ type memorySeries struct {
 	mtx sync.Mutex
 
 	metric clientmodel.Metric
-	// Sorted by start time, no overlapping chunk ranges allowed.
-	chunkDescs       chunkDescs
+	// Sorted by start time, overlapping chunk ranges are forbidden.
+	chunkDescs chunkDescs
+	// Whether chunkDescs for chunks on disk are loaded. Even if false, a head
+	// chunk could be present. In that case, its chunkDesc will be the
+	// only one in chunkDescs.
 	chunkDescsLoaded bool
 }
 
@@ -197,14 +200,14 @@ func (s *memorySeries) purgeOlderThan(t clientmodel.Timestamp, p Persistence) (d
 	return len(s.chunkDescs) == 0, nil
 }
 
-func (s *memorySeries) close() {
-	for _, cd := range s.chunkDescs {
-		if cd.chunk != nil {
-			cd.evictNow()
-		}
-		// TODO: need to handle unwritten heads here.
-	}
-}
+// TODO: Remove if not needed anymore.
+// func (s *memorySeries) close() {
+// 	for _, cd := range s.chunkDescs {
+// 		if cd.chunk != nil {
+// 			cd.evictNow()
+// 		}
+// 	}
+// }
 
 // TODO: in this method (and other places), we just fudge around with chunkDesc
 // internals without grabbing the chunkDesc lock. Study how this needs to be

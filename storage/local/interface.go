@@ -5,6 +5,9 @@ import (
 	"github.com/prometheus/prometheus/storage/metric"
 )
 
+// SeriesMap maps fingerprints to memory series.
+type SeriesMap map[clientmodel.Fingerprint]*memorySeries
+
 type Storage interface {
 	// AppendSamples stores a group of new samples. Multiple samples for the same
 	// fingerprint need to be submitted in chronological order, from oldest to
@@ -45,8 +48,9 @@ type SeriesIterator interface {
 type Persistence interface {
 	// PersistChunk persists a single chunk of a series.
 	PersistChunk(clientmodel.Fingerprint, chunk) error
-	// PersistHeads persists all open (non-full) head chunks.
-	PersistHeads(map[clientmodel.Fingerprint]*memorySeries) error
+	// PersistSeriesMapAndHeads persists the fingerprint to memory-series
+	// mapping and all open (non-full) head chunks.
+	PersistSeriesMapAndHeads(SeriesMap) error
 
 	// DropChunks deletes all chunks from a timeseries whose last sample time is
 	// before beforeTime.
@@ -58,10 +62,22 @@ type Persistence interface {
 	LoadChunks(fp clientmodel.Fingerprint, indexes []int) (chunks, error)
 	// LoadChunkDescs loads chunkDescs for a series up until a given time.
 	LoadChunkDescs(fp clientmodel.Fingerprint, beforeTime clientmodel.Timestamp) (chunkDescs, error)
-	// LoadHeads loads all open (non-full) head chunks.
-	LoadHeads(map[clientmodel.Fingerprint]*memorySeries) error
+	// LoadSeriesMapAndHeads loads the fingerprint to memory-series mapping
+	// and all open (non-full) head chunks.
+	LoadSeriesMapAndHeads() (SeriesMap, error)
 
-	// Close releases any held resources.
+	// GetFingerprintsForLabelPair returns the fingerprints for the given
+	// label pair.  It returns nil if the label pair is unknown, or there
+	// are no fingerprints for that name, or an error has happened in the
+	// persistence layer. In the latter case, an error message is logged.
+	GetFingerprintsForLabelPair(metric.LabelPair) clientmodel.Fingerprints
+	// GetLabelValuesForLabelName returns the label values for the given
+	// label name.  It returns nil if the label name is unknown, or there
+	// are no label values for that name, or an error has happened in the
+	// persistence layer. In the latter case, an error message is logged.
+	GetLabelValuesForLabelName(clientmodel.LabelName) clientmodel.LabelValues
+
+	// Close flushes buffered data and releases any held resources.
 	Close() error
 }
 
