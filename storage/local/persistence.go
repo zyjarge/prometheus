@@ -72,22 +72,20 @@ func NewDiskPersistence(basePath string, chunkLen int) (Persistence, error) {
 	return dp, nil
 }
 
-func (p *diskPersistence) GetFingerprintsForLabelPair(lp metric.LabelPair) clientmodel.Fingerprints {
+func (p *diskPersistence) GetFingerprintsForLabelPair(lp metric.LabelPair) (clientmodel.Fingerprints, error) {
 	fps, _, err := p.labelPairToFingerprints.Lookup(lp)
 	if err != nil {
-		glog.Errorf("Error getting fingerprints for label pair %v: %v", lp, err)
-		return nil
+		return nil, err
 	}
-	return fps
+	return fps, nil
 }
 
-func (p *diskPersistence) GetLabelValuesForLabelName(ln clientmodel.LabelName) clientmodel.LabelValues {
+func (p *diskPersistence) GetLabelValuesForLabelName(ln clientmodel.LabelName) (clientmodel.LabelValues, error) {
 	lvs, _, err := p.labelNameToLabelValues.Lookup(ln)
 	if err != nil {
-		glog.Errorf("Error getting label values for label name %q: %v", ln, err)
-		return nil
+		return nil, err
 	}
-	return lvs
+	return lvs, nil
 }
 
 func (p *diskPersistence) PersistChunk(fp clientmodel.Fingerprint, c chunk) error {
@@ -345,13 +343,13 @@ func (p *diskPersistence) LoadSeriesMapAndHeads() (SeriesMap, error) {
 	return fingerprintToSeries, nil
 }
 
-func (p *diskPersistence) DropChunks(fp clientmodel.Fingerprint, beforeTime clientmodel.Timestamp) error {
+func (p *diskPersistence) DropChunks(fp clientmodel.Fingerprint, beforeTime clientmodel.Timestamp) (bool, error) {
 	f, err := p.openChunkFileForReading(fp)
 	if os.IsNotExist(err) {
-		return nil
+		return true, nil
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer f.Close()
 
@@ -359,7 +357,7 @@ func (p *diskPersistence) DropChunks(fp clientmodel.Fingerprint, beforeTime clie
 	for i := 0; ; i++ {
 		_, err := f.Seek(p.offsetForChunkIndex(i)+chunkHeaderLastTimeOffset, os.SEEK_SET)
 		if err != nil {
-			return err
+			return false, err
 		}
 		lastTimeBuf := make([]byte, 8)
 		_, err = io.ReadAtLeast(f, lastTimeBuf, 8)
@@ -367,12 +365,12 @@ func (p *diskPersistence) DropChunks(fp clientmodel.Fingerprint, beforeTime clie
 			// We ran into the end of the file without finding any chunks that should
 			// be kept. Remove the whole file.
 			if err := os.Remove(f.Name()); err != nil {
-				return err
+				return true, err
 			}
-			return nil
+			return true, nil
 		}
 		if err != nil {
-			return err
+			return false, err
 		}
 		lastTime := clientmodel.Timestamp(binary.LittleEndian.Uint64(lastTimeBuf))
 		if !lastTime.Before(beforeTime) {
@@ -385,22 +383,62 @@ func (p *diskPersistence) DropChunks(fp clientmodel.Fingerprint, beforeTime clie
 	// file.
 	_, err = f.Seek(-(chunkHeaderLastTimeOffset + 8), os.SEEK_CUR)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	dirname := p.dirForFingerprint(fp)
 	temp, err := os.OpenFile(path.Join(dirname, seriesTempFileName), os.O_WRONLY|os.O_CREATE, 0640)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer temp.Close()
 
 	if _, err := io.Copy(temp, f); err != nil {
-		return err
+		return false, err
 	}
 
 	os.Rename(path.Join(dirname, seriesTempFileName), path.Join(dirname, seriesFileName))
+	return false, nil
+}
+
+func (d *diskPersistence) IndexMetric(m clientmodel.Metric) error {
+	// TODO: Implement. Possibly in a queue (which needs to be drained before shutdown).
 	return nil
+}
+
+func (d *diskPersistence) UnindexMetric(m clientmodel.Metric) error {
+	// TODO: Implement. Possibly in a queue (which needs to be drained before shutdown).
+	return nil
+}
+
+func (d *diskPersistence) ArchiveMetric(
+	fingerprint clientmodel.Fingerprint, metric clientmodel.Metric,
+	firstTime, lastTime clientmodel.Timestamp,
+) error {
+	// TODO: Implement.
+	return nil
+}
+
+func (d *diskPersistence) HasArchivedMetric(clientmodel.Fingerprint) (
+	hasMetric bool, firstTime, lastTime clientmodel.Timestamp, err error,
+) {
+	// TODO: Implement.
+	return
+}
+
+func (d *diskPersistence) GetArchivedMetric(clientmodel.Fingerprint) (clientmodel.Metric, error) {
+	// TODO: Implement.
+	return nil, nil
+}
+
+func (d *diskPersistence) DropArchivedMetric(clientmodel.Fingerprint) error {
+	// TODO: Implement. Unindex after drop!
+	return nil
+}
+
+func (d *diskPersistence) UnarchiveMetric(clientmodel.Fingerprint) (bool, error) {
+	// TODO: Implement.
+	return false, nil
 }
 
 func (d *diskPersistence) Close() error {

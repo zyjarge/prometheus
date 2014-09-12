@@ -54,7 +54,7 @@ type Persistence interface {
 
 	// DropChunks deletes all chunks from a timeseries whose last sample time is
 	// before beforeTime.
-	DropChunks(fp clientmodel.Fingerprint, beforeTime clientmodel.Timestamp) error
+	DropChunks(fp clientmodel.Fingerprint, beforeTime clientmodel.Timestamp) (allDropped bool, err error)
 
 	// LoadChunks loads a group of chunks of a timeseries by their index. The
 	// chunk with the earliest time will have index 0, the following ones will
@@ -67,15 +67,47 @@ type Persistence interface {
 	LoadSeriesMapAndHeads() (SeriesMap, error)
 
 	// GetFingerprintsForLabelPair returns the fingerprints for the given
-	// label pair.  It returns nil if the label pair is unknown, or there
-	// are no fingerprints for that name, or an error has happened in the
-	// persistence layer. In the latter case, an error message is logged.
-	GetFingerprintsForLabelPair(metric.LabelPair) clientmodel.Fingerprints
+	// label pair.
+	GetFingerprintsForLabelPair(metric.LabelPair) (clientmodel.Fingerprints, error)
 	// GetLabelValuesForLabelName returns the label values for the given
-	// label name.  It returns nil if the label name is unknown, or there
-	// are no label values for that name, or an error has happened in the
-	// persistence layer. In the latter case, an error message is logged.
-	GetLabelValuesForLabelName(clientmodel.LabelName) clientmodel.LabelValues
+	// label name.
+	GetLabelValuesForLabelName(clientmodel.LabelName) (clientmodel.LabelValues, error)
+
+	// IndexMetric indexes the given metric for the needs of
+	// GetFingerprintsForLabelPair and GetLabelValuesForLabelName.
+	IndexMetric(clientmodel.Metric) error
+	// UnindexMetric removes references to the given metric from the indexes
+	// used for GetFingerprintsForLabelPair and
+	// GetLabelValuesForLabelName. The index of fingerprints to archived
+	// metrics is not affected by this method. (In fact, never call this
+	// method for an archived metric. To drop an archived metric, call
+	// DropArchivedFingerprint.)
+	UnindexMetric(clientmodel.Metric) error
+
+	// ArchiveMetric persists the mapping of the given fingerprint to the
+	// given metric, together with the first and last timestamp of the
+	// series belonging to the metric.
+	ArchiveMetric(
+		fingerprint clientmodel.Fingerprint, metric clientmodel.Metric,
+		firstTime, lastTime clientmodel.Timestamp,
+	) error
+	// HasArchivedMetric returns whether the archived metric for the given
+	// fingerprint exists and if yes, what the first and last timestamp in
+	// the corresponding series is.
+	HasArchivedMetric(clientmodel.Fingerprint) (
+		hasMetric bool, firstTime, lastTime clientmodel.Timestamp, err error,
+	)
+	// GetArchivedMetric retrieves the archived metric with the given
+	// fingerprint.
+	GetArchivedMetric(clientmodel.Fingerprint) (clientmodel.Metric, error)
+	// DropArchivedMetric deletes an archived fingerprint and its
+	// corresponding metric entirely. It also un-indexes the metric (no need
+	// to call UnindexMetric for the deleted metric.)
+	DropArchivedMetric(clientmodel.Fingerprint) error
+	// UnarchiveMetric deletes an archived fingerprint and its metric, but
+	// (in contrast to DropArchivedMetric) does not un-index the metric.
+	// The method returns true if a metric was actually deleted.
+	UnarchiveMetric(clientmodel.Fingerprint) (bool, error)
 
 	// Close flushes buffered data and releases any held resources.
 	Close() error

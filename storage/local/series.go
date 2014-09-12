@@ -174,13 +174,10 @@ func (s *memorySeries) evictOlderThan(t clientmodel.Timestamp) {
 	}
 }
 
-func (s *memorySeries) purgeOlderThan(t clientmodel.Timestamp, p Persistence) (dropSeries bool, err error) {
+// purgeOlderThan returns true if all chunks have been purged.
+func (s *memorySeries) purgeOlderThan(t clientmodel.Timestamp) bool {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-
-	if err := p.DropChunks(s.metric.Fingerprint(), t); err != nil {
-		return false, err
-	}
 
 	keepIdx := len(s.chunkDescs)
 	for i, cd := range s.chunkDescs {
@@ -196,18 +193,8 @@ func (s *memorySeries) purgeOlderThan(t clientmodel.Timestamp, p Persistence) (d
 		}
 	}
 	s.chunkDescs = s.chunkDescs[keepIdx:]
-
-	return len(s.chunkDescs) == 0, nil
+	return len(s.chunkDescs) == 0
 }
-
-// TODO: Remove if not needed anymore.
-// func (s *memorySeries) close() {
-// 	for _, cd := range s.chunkDescs {
-// 		if cd.chunk != nil {
-// 			cd.evictNow()
-// 		}
-// 	}
-// }
 
 // TODO: in this method (and other places), we just fudge around with chunkDesc
 // internals without grabbing the chunkDesc lock. Study how this needs to be
