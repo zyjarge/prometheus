@@ -56,15 +56,9 @@ func (i *FingerprintMetricIndex) UnindexBatch(mapping FingerprintMetricMapping) 
 }
 
 // Lookup looks up a metric by fingerprint.
-func (i *FingerprintMetricIndex) Lookup(fp clientmodel.Fingerprint) (clientmodel.Metric, bool, error) {
-	m := codec.CodableMetric{}
-	if ok, err := i.Get(codec.CodableFingerprint(fp), &m); !ok {
-		return nil, false, nil
-	} else if err != nil {
-		return nil, false, err
-	}
-
-	return clientmodel.Metric(m), true, nil
+func (i *FingerprintMetricIndex) Lookup(fp clientmodel.Fingerprint) (metric clientmodel.Metric, ok bool, err error) {
+	ok, err = i.Get(codec.CodableFingerprint(fp), (*codec.CodableMetric)(&metric))
+	return
 }
 
 // NewFingerprintMetricIndex returns a FingerprintMetricIndex
@@ -110,14 +104,7 @@ func (i *LabelNameLabelValuesIndex) IndexBatch(b LabelNameLabelValuesMapping) er
 // Lookup looks up all label values for a given label name.
 func (i *LabelNameLabelValuesIndex) Lookup(l clientmodel.LabelName) (values clientmodel.LabelValues, ok bool, err error) {
 	ok, err = i.Get(codec.CodableLabelName(l), (*codec.CodableLabelValues)(&values))
-	if err != nil {
-		return nil, false, err
-	}
-	if !ok {
-		return nil, false, nil
-	}
-
-	return values, true, nil
+	return
 }
 
 // NewLabelNameLabelValuesIndex returns a LabelNameLabelValuesIndex
@@ -163,14 +150,7 @@ func (i *LabelPairFingerprintIndex) IndexBatch(m LabelPairFingerprintsMapping) e
 // Lookup looks up all fingerprints for a given label pair.
 func (i *LabelPairFingerprintIndex) Lookup(p metric.LabelPair) (fps clientmodel.Fingerprints, ok bool, err error) {
 	ok, err = i.Get((codec.CodableLabelPair)(p), (*codec.CodableFingerprints)(&fps))
-	if !ok {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
-
-	return fps, true, nil
+	return
 }
 
 // NewLabelPairFingerprintIndex returns a LabelPairFingerprintIndex
@@ -194,15 +174,11 @@ type FingerprintTimeRangeIndex struct {
 	KeyValueStore
 }
 
-// UnindexBatch unindexes a batch of fingerprints.
-func (i *FingerprintTimeRangeIndex) UnindexBatch(b FingerprintMetricMapping) error {
-	batch := i.NewBatch()
-
-	for fp, _ := range b {
-		batch.Delete(codec.CodableFingerprint(fp))
-	}
-
-	return i.Commit(batch)
+// Lookup returns the time range for the given fingerprint.
+func (i *FingerprintTimeRangeIndex) Lookup(fp clientmodel.Fingerprint) (firstTime, lastTime clientmodel.Timestamp, ok bool, err error) {
+	var tr codec.CodableTimeRange
+	ok, err = i.Get(codec.CodableFingerprint(fp), &tr)
+	return tr.First, tr.Last, ok, err
 }
 
 // Has returns true if the given fingerprint is present.
