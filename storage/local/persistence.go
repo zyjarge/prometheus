@@ -401,14 +401,25 @@ func (p *diskPersistence) DropChunks(fp clientmodel.Fingerprint, beforeTime clie
 	return false, nil
 }
 
-func (d *diskPersistence) IndexMetric(m clientmodel.Metric) error {
-	// TODO: Implement. Possibly in a queue (which needs to be drained before shutdown).
-	return nil
+func (d *diskPersistence) IndexMetric(m clientmodel.Metric, fp clientmodel.Fingerprint) error {
+	// TODO: Don't do it directly, but add it to a queue (which needs to be
+	// drained before shutdown). Queuing would make this asynchronously, and
+	// then batches could be created easily.
+	if err := d.labelNameToLabelValues.Extend(m); err != nil {
+		return err
+	}
+	return d.labelPairToFingerprints.Extend(m, fp)
 }
 
-func (d *diskPersistence) UnindexMetric(m clientmodel.Metric) error {
-	// TODO: Implement. Possibly in a queue (which needs to be drained before shutdown).
-	return nil
+func (d *diskPersistence) UnindexMetric(m clientmodel.Metric, fp clientmodel.Fingerprint) error {
+	// TODO: Don't do it directly, but add it to a queue (which needs to be
+	// drained before shutdown). Queuing would make this asynchronously, and
+	// then batches could be created easily.
+	labelPairs, err := d.labelPairToFingerprints.Reduce(m, fp)
+	if err != nil {
+		return err
+	}
+	return d.labelNameToLabelValues.Reduce(labelPairs)
 }
 
 func (d *diskPersistence) ArchiveMetric(
@@ -448,7 +459,7 @@ func (d *diskPersistence) DropArchivedMetric(fp clientmodel.Fingerprint) error {
 	if err := d.archivedFingerprintToTimeRange.Delete(codec.CodableFingerprint(fp)); err != nil {
 		return err
 	}
-	return d.UnindexMetric(metric)
+	return d.UnindexMetric(metric, fp)
 }
 
 func (d *diskPersistence) UnarchiveMetric(fp clientmodel.Fingerprint) (bool, error) {
