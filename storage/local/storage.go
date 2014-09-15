@@ -286,7 +286,9 @@ func (s *memorySeriesStorage) purgeSeries(fp clientmodel.Fingerprint) {
 	// persistence.PersistChunck needs to be locked on fp level, or
 	// something. And even then, what happens if everything is dropped, but
 	// there are still chunks hung in the persist queue? They would later
-	// re-create a file for a series that doesn't exist anymore...
+	// re-create a file for a series that doesn't exist anymore...  But
+	// there is the ref count, which is one higher if you have not yet
+	// persisted the chunk.
 	defer s.mtx.Unlock()
 
 	// First purge persisted chunks. We need to do that anyway.
@@ -306,8 +308,9 @@ func (s *memorySeriesStorage) purgeSeries(fp clientmodel.Fingerprint) {
 		return
 	}
 
-	// If nothing was in memory, the metric must have been archived. Drop
-	// the archived metric if there are no persisted chunks left.
+	// If we arrive here, nothing was in memory, so the metric must have
+	// been archived. Drop the archived metric if there are no persisted
+	// chunks left.
 	if !allDropped {
 		return
 	}
