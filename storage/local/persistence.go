@@ -33,6 +33,12 @@ const (
 	chunkHeaderLastTimeOffset  = 9
 )
 
+const (
+	_                         = iota
+	flagChunkDescsLoaded byte = 1 << iota
+	flagHeadChunkPersisted
+)
+
 type diskPersistence struct {
 	basePath string
 	chunkLen int
@@ -226,6 +232,16 @@ func (p *diskPersistence) PersistSeriesMapAndHeads(fingerprintToSeries SeriesMap
 	}
 
 	for fp, series := range fingerprintToSeries {
+		var seriesFlags byte
+		if series.chunkDescsLoaded {
+			seriesFlags |= flagChunkDescsLoaded
+		}
+		if series.headChunkPersisted {
+			seriesFlags |= flagHeadChunkPersisted
+		}
+		if err := w.WriteByte(seriesFlags); err != nil {
+			return err
+		}
 		if err := codec.EncodeUint64(w, uint64(fp)); err != nil {
 			return err
 		}
@@ -238,7 +254,7 @@ func (p *diskPersistence) PersistSeriesMapAndHeads(fingerprintToSeries SeriesMap
 			return err
 		}
 		for i, chunkDesc := range series.chunkDescs {
-			if i < len(series.chunkDescs)-1 {
+			if series.headChunkPersisted || i < len(series.chunkDescs)-1 {
 				if err := codec.EncodeVarint(w, int64(chunkDesc.firstTime())); err != nil {
 					return err
 				}
@@ -246,7 +262,7 @@ func (p *diskPersistence) PersistSeriesMapAndHeads(fingerprintToSeries SeriesMap
 					return err
 				}
 			} else {
-				// This is the head chunk. Fully marshal it.
+				// This is the non-persisted head chunk. Fully marshal it.
 				if err := w.WriteByte(chunkType(chunkDesc.chunk)); err != nil {
 					return err
 				}
@@ -291,6 +307,11 @@ func (p *diskPersistence) LoadSeriesMapAndHeads() (SeriesMap, error) {
 	fingerprintToSeries := make(SeriesMap, numSeries)
 
 	for ; numSeries > 0; numSeries-- {
+		seriesFlags, err := r.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		headChunkPersisted := seriesFlags&flagHeadChunkPersisted != 0
 		fp, err := codec.DecodeUint64(r)
 		if err != nil {
 			return nil, err
@@ -305,39 +326,42 @@ func (p *diskPersistence) LoadSeriesMapAndHeads() (SeriesMap, error) {
 		}
 		chunkDescs := make(chunkDescs, numChunkDescs)
 
-		for i := int64(0); i < numChunkDescs-1; i++ {
-			firstTime, err := binary.ReadVarint(r)
-			if err != nil {
-				return nil, err
+		for i := int64(0); i < numChunkDescs; i++ {
+			if headChunkPersisted || i < numChunkDescs-1 {
+				firstTime, err := binary.ReadVarint(r)
+				if err != nil {
+					return nil, err
+				}
+				lastTime, err := binary.ReadVarint(r)
+				if err != nil {
+					return nil, err
+				}
+				chunkDescs[i] = &chunkDesc{
+					firstTimeField: clientmodel.Timestamp(firstTime),
+					lastTimeField:  clientmodel.Timestamp(lastTime),
+				}
+			} else {
+				// Non-persisted head chunk.
+				chunkType, err := r.ReadByte()
+				if err != nil {
+					return nil, err
+				}
+				chunk := chunkForType(chunkType)
+				if err := chunk.unmarshal(r); err != nil {
+					return nil, err
+				}
+				chunkDescs[i] = &chunkDesc{
+					chunk:    chunk,
+					refCount: 1,
+				}
 			}
-			lastTime, err := binary.ReadVarint(r)
-			if err != nil {
-				return nil, err
-			}
-			chunkDescs[i] = &chunkDesc{
-				firstTimeField: clientmodel.Timestamp(firstTime),
-				lastTimeField:  clientmodel.Timestamp(lastTime),
-			}
-		}
-
-		// Head chunk.
-		chunkType, err := r.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-		chunk := chunkForType(chunkType)
-		if err := chunk.unmarshal(r); err != nil {
-			return nil, err
-		}
-		chunkDescs[numChunkDescs-1] = &chunkDesc{
-			chunk:    chunk,
-			refCount: 1,
 		}
 
 		fingerprintToSeries[clientmodel.Fingerprint(fp)] = &memorySeries{
-			metric:           clientmodel.Metric(metric),
-			chunkDescs:       chunkDescs,
-			chunkDescsLoaded: true,
+			metric:             clientmodel.Metric(metric),
+			chunkDescs:         chunkDescs,
+			chunkDescsLoaded:   seriesFlags&flagChunkDescsLoaded != 0,
+			headChunkPersisted: headChunkPersisted,
 		}
 	}
 	return fingerprintToSeries, nil

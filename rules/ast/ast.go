@@ -25,11 +25,11 @@ import (
 	clientmodel "github.com/prometheus/client_golang/model"
 
 	"github.com/prometheus/prometheus/stats"
-	"github.com/prometheus/prometheus/storage/metric"
 	"github.com/prometheus/prometheus/storage/local"
+	"github.com/prometheus/prometheus/storage/metric"
 )
 
-var defaultStalenessDelta = flag.Duration("defaultStalenessDelta", 300*time.Second, "Default staleness delta allowance in seconds during expression evaluations.")
+var stalenessDelta = flag.Duration("stalenessDelta", 300*time.Second, "Staleness delta allowance during expression evaluations.")
 
 // ----------------------------------------------------------------------------
 // Raw data value types.
@@ -538,7 +538,7 @@ func chooseClosestSample(samples metric.Values, timestamp clientmodel.Timestamp)
 		// Samples before target time.
 		if delta < 0 {
 			// Ignore samples outside of staleness policy window.
-			if -delta > *defaultStalenessDelta {
+			if -delta > *stalenessDelta {
 				continue
 			}
 			// Ignore samples that are farther away than what we've seen before.
@@ -552,7 +552,7 @@ func chooseClosestSample(samples metric.Values, timestamp clientmodel.Timestamp)
 		// Samples after target time.
 		if delta >= 0 {
 			// Ignore samples outside of staleness policy window.
-			if delta > *defaultStalenessDelta {
+			if delta > *stalenessDelta {
 				continue
 			}
 			// Ignore samples that are farther away than samples we've seen before.

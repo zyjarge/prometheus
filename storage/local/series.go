@@ -102,25 +102,18 @@ type memorySeries struct {
 	metric clientmodel.Metric
 	// Sorted by start time, overlapping chunk ranges are forbidden.
 	chunkDescs chunkDescs
-	// Whether chunkDescs for chunks on disk are loaded. Even if false, a head
-	// chunk could be present. In that case, its chunkDesc will be the
-	// only one in chunkDescs.
+	// Whether chunkDescs for chunks on disk are all loaded.  If false, some
+	// (or all) chunkDescs are only on disk. These chunks are all contiguous
+	// and at the tail end.
 	chunkDescsLoaded bool
+	// Whether the current head chunk has already been persisted. If true,
+	// the current head chunk must not be modified anymore.
+	headChunkPersisted bool
 }
 
 func newMemorySeries(m clientmodel.Metric) *memorySeries {
 	return &memorySeries{
-		metric: m,
-		// TODO: should we set this to nil initially and only create a chunk when
-		// adding? But right now, we also only call newMemorySeries when adding, so
-		// it turns out to be the same.
-		chunkDescs: chunkDescs{
-			// TODO: should there be a newChunkDesc() function?
-			&chunkDesc{
-				chunk:    newDeltaEncodedChunk(d1, d0, true),
-				refCount: 1,
-			},
-		},
+		metric:           m,
 		chunkDescsLoaded: true,
 	}
 }
@@ -128,6 +121,15 @@ func newMemorySeries(m clientmodel.Metric) *memorySeries {
 func (s *memorySeries) add(v *metric.SamplePair, persistQueue chan *persistRequest) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
+
+	if len(s.chunkDescs) == 0 || s.headChunkPersisted {
+		newHead := &chunkDesc{
+			chunk:    newDeltaEncodedChunk(d1, d0, true),
+			refCount: 1,
+		}
+		s.chunkDescs = append(s.chunkDescs, newHead)
+		s.headChunkPersisted = false
+	}
 
 	chunks := s.head().add(v)
 
