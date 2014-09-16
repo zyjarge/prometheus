@@ -18,8 +18,6 @@ type chunk interface {
 	newIterator() chunkIterator
 	marshal(io.Writer) error
 	unmarshal(io.Reader) error
-
-	// TODO: remove?
 	values() <-chan *metric.SamplePair
 }
 

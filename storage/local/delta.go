@@ -245,7 +245,6 @@ func (c *deltaEncodedChunk) len() int {
 	return (len(c.buf) - deltaHeaderBytes) / c.sampleSize()
 }
 
-// TODO: remove?
 func (c *deltaEncodedChunk) values() <-chan *metric.SamplePair {
 	n := c.len()
 	valuesChan := make(chan *metric.SamplePair)

@@ -123,7 +123,8 @@ func (s *memorySeriesStorage) getOrCreateSeries(m clientmodel.Metric) *memorySer
 			// The series existed before, had been archived at some
 			// point, and has now been unarchived, i.e. it has
 			// chunks on disk. Set chunkDescsLoaded accordingly so
-			// that they will be looked at later.
+			// that they will be looked at later. Also, an
+			// unarchived series comes with a persisted head chunk.
 			series.chunkDescsLoaded = false
 			series.headChunkPersisted = true
 		} else {
@@ -212,7 +213,6 @@ func recordPersist(start time.Time, err error) {
 }
 
 func (s *memorySeriesStorage) handlePersistQueue() {
-	// TODO: Perhaps move this into Persistence?
 	for req := range s.persistQueue {
 		// TODO: Make this thread-safe?
 		persistQueueLength.Set(float64(len(s.persistQueue)))
