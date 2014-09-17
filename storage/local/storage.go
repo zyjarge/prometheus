@@ -1,4 +1,4 @@
-package storage_ng
+package local
 
 import (
 	"fmt"
@@ -40,14 +40,19 @@ type memorySeriesStorage struct {
 	persistence  Persistence
 }
 
+// MemorySeriesStorageOptions contains options needed by
+// NewMemorySeriesStorage. It is not safe to leave any of those at their zero
+// values.
 type MemorySeriesStorageOptions struct {
-	Persistence                Persistence
-	MemoryEvictionInterval     time.Duration
-	MemoryRetentionPeriod      time.Duration
-	PersistencePurgeInterval   time.Duration
-	PersistenceRetentionPeriod time.Duration
+	Persistence                Persistence   // Used to persist storage content across restarts.
+	MemoryEvictionInterval     time.Duration // How often to check for memory eviction.
+	MemoryRetentionPeriod      time.Duration // Chunks at least that old are evicted from memory.
+	PersistencePurgeInterval   time.Duration // How often to check for purging.
+	PersistenceRetentionPeriod time.Duration // Chunks at least that old are purged.
 }
 
+// NewMemorySeriesStorage returns a newly allocated Storage. Storage.Serve still
+// has to be called to start the storage.
 func NewMemorySeriesStorage(o *MemorySeriesStorageOptions) (Storage, error) {
 	glog.Info("Loading series map and head chunks...")
 	fingerprintToSeries, err := o.Persistence.LoadSeriesMapAndHeads()

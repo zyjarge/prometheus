@@ -1,4 +1,4 @@
-package storage_ng
+package local
 
 import (
 	"bufio"
@@ -49,6 +49,7 @@ type diskPersistence struct {
 	labelNameToLabelValues         *index.LabelNameLabelValuesIndex
 }
 
+// NewDiskPersistence returns a newly allocated Persistence backed by local disk storage, ready to use.
 func NewDiskPersistence(basePath string, chunkLen int) (Persistence, error) {
 	if err := os.MkdirAll(basePath, 0700); err != nil {
 		return nil, err
@@ -425,97 +426,97 @@ func (p *diskPersistence) DropChunks(fp clientmodel.Fingerprint, beforeTime clie
 	return false, nil
 }
 
-func (d *diskPersistence) IndexMetric(m clientmodel.Metric, fp clientmodel.Fingerprint) error {
+func (p *diskPersistence) IndexMetric(m clientmodel.Metric, fp clientmodel.Fingerprint) error {
 	// TODO: Don't do it directly, but add it to a queue (which needs to be
 	// drained before shutdown). Queuing would make this asynchronously, and
 	// then batches could be created easily.
-	if err := d.labelNameToLabelValues.Extend(m); err != nil {
+	if err := p.labelNameToLabelValues.Extend(m); err != nil {
 		return err
 	}
-	return d.labelPairToFingerprints.Extend(m, fp)
+	return p.labelPairToFingerprints.Extend(m, fp)
 }
 
-func (d *diskPersistence) UnindexMetric(m clientmodel.Metric, fp clientmodel.Fingerprint) error {
+func (p *diskPersistence) UnindexMetric(m clientmodel.Metric, fp clientmodel.Fingerprint) error {
 	// TODO: Don't do it directly, but add it to a queue (which needs to be
 	// drained before shutdown). Queuing would make this asynchronously, and
 	// then batches could be created easily.
-	labelPairs, err := d.labelPairToFingerprints.Reduce(m, fp)
+	labelPairs, err := p.labelPairToFingerprints.Reduce(m, fp)
 	if err != nil {
 		return err
 	}
-	return d.labelNameToLabelValues.Reduce(labelPairs)
+	return p.labelNameToLabelValues.Reduce(labelPairs)
 }
 
-func (d *diskPersistence) ArchiveMetric(
+func (p *diskPersistence) ArchiveMetric(
 	// TODO: Two step process, make sure this happens atomically.
 	fp clientmodel.Fingerprint, m clientmodel.Metric, first, last clientmodel.Timestamp,
 ) error {
-	if err := d.archivedFingerprintToMetrics.Put(codec.CodableFingerprint(fp), codec.CodableMetric(m)); err != nil {
+	if err := p.archivedFingerprintToMetrics.Put(codec.CodableFingerprint(fp), codec.CodableMetric(m)); err != nil {
 		return err
 	}
-	if err := d.archivedFingerprintToTimeRange.Put(codec.CodableFingerprint(fp), codec.CodableTimeRange{First: first, Last: last}); err != nil {
+	if err := p.archivedFingerprintToTimeRange.Put(codec.CodableFingerprint(fp), codec.CodableTimeRange{First: first, Last: last}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (d *diskPersistence) HasArchivedMetric(fp clientmodel.Fingerprint) (
+func (p *diskPersistence) HasArchivedMetric(fp clientmodel.Fingerprint) (
 	hasMetric bool, firstTime, lastTime clientmodel.Timestamp, err error,
 ) {
-	firstTime, lastTime, hasMetric, err = d.archivedFingerprintToTimeRange.Lookup(fp)
+	firstTime, lastTime, hasMetric, err = p.archivedFingerprintToTimeRange.Lookup(fp)
 	return
 }
 
-func (d *diskPersistence) GetArchivedMetric(fp clientmodel.Fingerprint) (clientmodel.Metric, error) {
-	metric, _, err := d.archivedFingerprintToMetrics.Lookup(fp)
+func (p *diskPersistence) GetArchivedMetric(fp clientmodel.Fingerprint) (clientmodel.Metric, error) {
+	metric, _, err := p.archivedFingerprintToMetrics.Lookup(fp)
 	return metric, err
 }
 
-func (d *diskPersistence) DropArchivedMetric(fp clientmodel.Fingerprint) error {
+func (p *diskPersistence) DropArchivedMetric(fp clientmodel.Fingerprint) error {
 	// TODO: Multi-step process, make sure this happens atomically.
-	metric, err := d.GetArchivedMetric(fp)
+	metric, err := p.GetArchivedMetric(fp)
 	if err != nil || metric == nil {
 		return err
 	}
-	if err := d.archivedFingerprintToMetrics.Delete(codec.CodableFingerprint(fp)); err != nil {
+	if err := p.archivedFingerprintToMetrics.Delete(codec.CodableFingerprint(fp)); err != nil {
 		return err
 	}
-	if err := d.archivedFingerprintToTimeRange.Delete(codec.CodableFingerprint(fp)); err != nil {
+	if err := p.archivedFingerprintToTimeRange.Delete(codec.CodableFingerprint(fp)); err != nil {
 		return err
 	}
-	return d.UnindexMetric(metric, fp)
+	return p.UnindexMetric(metric, fp)
 }
 
-func (d *diskPersistence) UnarchiveMetric(fp clientmodel.Fingerprint) (bool, error) {
+func (p *diskPersistence) UnarchiveMetric(fp clientmodel.Fingerprint) (bool, error) {
 	// TODO: Multi-step process, make sure this happens atomically.
-	has, err := d.archivedFingerprintToTimeRange.Has(fp)
+	has, err := p.archivedFingerprintToTimeRange.Has(fp)
 	if err != nil || !has {
 		return false, err
 	}
-	if err := d.archivedFingerprintToMetrics.Delete(codec.CodableFingerprint(fp)); err != nil {
+	if err := p.archivedFingerprintToMetrics.Delete(codec.CodableFingerprint(fp)); err != nil {
 		return false, err
 	}
-	if err := d.archivedFingerprintToTimeRange.Delete(codec.CodableFingerprint(fp)); err != nil {
+	if err := p.archivedFingerprintToTimeRange.Delete(codec.CodableFingerprint(fp)); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func (d *diskPersistence) Close() error {
+func (p *diskPersistence) Close() error {
 	var lastError error
-	if err := d.archivedFingerprintToMetrics.Close(); err != nil {
+	if err := p.archivedFingerprintToMetrics.Close(); err != nil {
 		lastError = err
 		glog.Error("Error closing archivedFingerprintToMetric index DB: ", err)
 	}
-	if err := d.archivedFingerprintToTimeRange.Close(); err != nil {
+	if err := p.archivedFingerprintToTimeRange.Close(); err != nil {
 		lastError = err
 		glog.Error("Error closing archivedFingerprintToTimeRange index DB: ", err)
 	}
-	if err := d.labelPairToFingerprints.Close(); err != nil {
+	if err := p.labelPairToFingerprints.Close(); err != nil {
 		lastError = err
 		glog.Error("Error closing labelPairToFingerprints index DB: ", err)
 	}
-	if err := d.labelNameToLabelValues.Close(); err != nil {
+	if err := p.labelNameToLabelValues.Close(); err != nil {
 		lastError = err
 		glog.Error("Error closing labelNameToLabelValues index DB: ", err)
 	}
