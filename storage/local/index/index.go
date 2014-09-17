@@ -37,6 +37,10 @@ type FingerprintMetricIndex struct {
 }
 
 // IndexBatch indexes a batch of mappings from fingerprints to metrics.
+//
+// This method is goroutine-safe, but note that no specific order of execution
+// can be guaranteed (especially critical if IndexBatch and UnindexBatch are
+// called concurrently).
 func (i *FingerprintMetricIndex) IndexBatch(mapping FingerprintMetricMapping) error {
 	b := i.NewBatch()
 
@@ -48,6 +52,10 @@ func (i *FingerprintMetricIndex) IndexBatch(mapping FingerprintMetricMapping) er
 }
 
 // UnindexBatch unindexes a batch of mappings from fingerprints to metrics.
+//
+// This method is goroutine-safe, but note that no specific order of execution
+// can be guaranteed (especially critical if IndexBatch and UnindexBatch are
+// called concurrently).
 func (i *FingerprintMetricIndex) UnindexBatch(mapping FingerprintMetricMapping) error {
 	b := i.NewBatch()
 
@@ -60,6 +68,8 @@ func (i *FingerprintMetricIndex) UnindexBatch(mapping FingerprintMetricMapping) 
 
 // Lookup looks up a metric by fingerprint. Looking up a non-existing
 // fingerprint is not an error. In that case, (nil, false, nil) is returned.
+//
+// This method is goroutine-safe.
 func (i *FingerprintMetricIndex) Lookup(fp clientmodel.Fingerprint) (metric clientmodel.Metric, ok bool, err error) {
 	ok, err = i.Get(codec.CodableFingerprint(fp), (*codec.CodableMetric)(&metric))
 	return
@@ -93,6 +103,11 @@ type LabelNameLabelValuesIndex struct {
 // IndexBatch adds a batch of label name to label values mappings to the
 // index. A mapping of a label name to an empty slice of label values results in
 // a deletion of that mapping from the index.
+//
+// While this method is fundamentally goroutine-safe, note that the order of
+// execution for multiple batches executed concurrently is undefined. Also, it
+// is in general not safe to mutate the index while Extend or Reduce are
+// running.
 func (i *LabelNameLabelValuesIndex) IndexBatch(b LabelNameLabelValuesMapping) error {
 	batch := i.NewBatch()
 
@@ -114,6 +129,8 @@ func (i *LabelNameLabelValuesIndex) IndexBatch(b LabelNameLabelValuesMapping) er
 // Lookup looks up all label values for a given label name. Looking up a
 // non-existing label name is not an error. In that case, (nil, false, nil) is
 // returned.
+//
+// This method is goroutine-safe.
 func (i *LabelNameLabelValuesIndex) Lookup(l clientmodel.LabelName) (values clientmodel.LabelValues, ok bool, err error) {
 	ok, err = i.Get(codec.CodableLabelName(l), (*codec.CodableLabelValues)(&values))
 	return
@@ -122,6 +139,8 @@ func (i *LabelNameLabelValuesIndex) Lookup(l clientmodel.LabelName) (values clie
 // Extend incorporates the given metric into the index, i.e. it creates new
 // label name to label values mappings for new label names, and it extends the
 // label values list mapped from already existing label names appropriately.
+//
+// This method is not goroutine-safe.
 func (i *LabelNameLabelValuesIndex) Extend(m clientmodel.Metric) error {
 	b := make(LabelNameLabelValuesMapping, len(m))
 	for ln, lv := range m {
@@ -154,6 +173,8 @@ func (i *LabelNameLabelValuesIndex) Extend(m clientmodel.Metric) error {
 // pair is removed from the list of label values mapped to the name of that
 // label pair. Label names that are then mapped to zero label values are removed
 // entirely from the index.
+//
+// This method is not goroutine-safe.
 func (i *LabelNameLabelValuesIndex) Reduce(m LabelPairFingerprintsMapping) error {
 	b := make(LabelNameLabelValuesMapping, len(m))
 	for lp, fps := range m {
@@ -215,6 +236,11 @@ type LabelPairFingerprintIndex struct {
 // IndexBatch indexes a batch of mappings from label pairs to fingerprints. A
 // mapping to an empty slice of fingerprints results in deletion of that mapping
 // from the index.
+//
+// While this method is fundamentally goroutine-safe, note that the order of
+// execution for multiple batches executed concurrently is undefined. Also, it
+// is in general not safe to mutate the index while Extend or Reduce are
+// running.
 func (i *LabelPairFingerprintIndex) IndexBatch(m LabelPairFingerprintsMapping) error {
 	batch := i.NewBatch()
 
@@ -232,6 +258,8 @@ func (i *LabelPairFingerprintIndex) IndexBatch(m LabelPairFingerprintsMapping) e
 // Lookup looks up all fingerprints for a given label pair.  Looking up a
 // non-existing label pair is not an error. In that case, (nil, false, nil) is
 // returned.
+//
+// This method is goroutine-safe.
 func (i *LabelPairFingerprintIndex) Lookup(p metric.LabelPair) (fps clientmodel.Fingerprints, ok bool, err error) {
 	ok, err = i.Get((codec.CodableLabelPair)(p), (*codec.CodableFingerprints)(&fps))
 	return
@@ -240,6 +268,8 @@ func (i *LabelPairFingerprintIndex) Lookup(p metric.LabelPair) (fps clientmodel.
 // Extend incorporates the given metric into the index, i.e. it creates new
 // label pair to fingerprint mappings for new label pairs, and it extends the
 // fingerprint list mapped from already existing label pairs appropriately.
+//
+// This method is not goroutine-safe.
 func (i *LabelPairFingerprintIndex) Extend(m clientmodel.Metric, fp clientmodel.Fingerprint) error {
 	b := make(LabelPairFingerprintsMapping, len(m))
 	for ln, lv := range m {
@@ -269,6 +299,8 @@ func (i *LabelPairFingerprintIndex) Extend(m clientmodel.Metric, fp clientmodel.
 // Reduce removes the given fingerprint from the fingerprint lists mapped from
 // the label pairs contained in the given metric. All the updated mappings are
 // returned (for consumption by LabelNameLabelValuesIndex.Reduce).
+//
+// This method is not goroutine-safe.
 func (i *LabelPairFingerprintIndex) Reduce(m clientmodel.Metric, fp clientmodel.Fingerprint) (LabelPairFingerprintsMapping, error) {
 	b := make(LabelPairFingerprintsMapping, len(m))
 	for ln, lv := range m {
@@ -319,6 +351,8 @@ type FingerprintTimeRangeIndex struct {
 // Lookup returns the time range for the given fingerprint.  Looking up a
 // non-existing fingerprint is not an error. In that case, (0, 0, false, nil) is
 // returned.
+//
+// This method is goroutine-safe.
 func (i *FingerprintTimeRangeIndex) Lookup(fp clientmodel.Fingerprint) (firstTime, lastTime clientmodel.Timestamp, ok bool, err error) {
 	var tr codec.CodableTimeRange
 	ok, err = i.Get(codec.CodableFingerprint(fp), &tr)
@@ -326,6 +360,8 @@ func (i *FingerprintTimeRangeIndex) Lookup(fp clientmodel.Fingerprint) (firstTim
 }
 
 // Has returns true if the given fingerprint is present.
+//
+// This method is goroutine-safe.
 func (i *FingerprintTimeRangeIndex) Has(fp clientmodel.Fingerprint) (ok bool, err error) {
 	return i.KeyValueStore.Has(codec.CodableFingerprint(fp))
 }

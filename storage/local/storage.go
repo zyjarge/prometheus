@@ -1,3 +1,4 @@
+// Package local contains the local time series storage used by Prometheus.
 package local
 
 import (

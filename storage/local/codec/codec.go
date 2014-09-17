@@ -58,8 +58,11 @@ type byteReader interface {
 	io.ByteReader
 }
 
+// bufPool is a pool for staging buffers. Using a pool allows concurrency-safe
+// reuse of buffers
 var bufPool sync.Pool
 
+// getBuf returns a buffer from the pool. The length of the returned slice is l.
 func getBuf(l int) []byte {
 	x := bufPool.Get()
 	if x == nil {
@@ -72,6 +75,7 @@ func getBuf(l int) []byte {
 	return buf[:l]
 }
 
+// putBuf returns a buffer to the pool.
 func putBuf(buf []byte) {
 	bufPool.Put(buf)
 }
@@ -113,6 +117,8 @@ func DecodeUint64(r io.Reader) (uint64, error) {
 	return binary.BigEndian.Uint64(buf), nil
 }
 
+// encodeString writes the varint encoded length followed by the bytes of s to
+// b.
 func encodeString(b *bytes.Buffer, s string) error {
 	if err := EncodeVarint(b, int64(len(s))); err != nil {
 		return err
@@ -123,6 +129,7 @@ func encodeString(b *bytes.Buffer, s string) error {
 	return nil
 }
 
+// decodeString decodes a string encoded by encodeString.
 func decodeString(b byteReader) (string, error) {
 	length, err := binary.ReadVarint(b)
 	if err != nil {
