@@ -21,8 +21,34 @@ type KeyValueStore interface {
 
 	NewBatch() Batch
 	Commit(b Batch) error
+	ForEach(func(kv KeyValueAccessor) error) error
 
 	Close() error
+}
+
+// Iterator models an iterator over the keys and values in a
+// KeyValueStore. goroutine safety depends on the implementation.
+type Iterator interface {
+	Error() error
+	Valid() bool
+
+	SeekToFirst() bool
+	SeekToLast() bool
+	Seek(encoding.BinaryMarshaler) bool
+
+	Next() bool
+	Previous() bool
+
+	KeyValueAccessor
+
+	Close() error
+}
+
+// KeyValueAccessor allows access to the key and value of an entry in a
+// KeyValueStore.
+type KeyValueAccessor interface {
+	Key(encoding.BinaryUnmarshaler) error
+	Value(encoding.BinaryUnmarshaler) error
 }
 
 // Batch allows KeyValueStore mutations to be pooled and committed together. An
