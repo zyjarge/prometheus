@@ -358,6 +358,7 @@ func (s *memorySeries) lastTime() clientmodel.Timestamp {
 	return s.head().lastTime()
 }
 
+// GetValueAtTime implements SeriesIterator.
 func (it *memorySeriesIterator) GetValueAtTime(t clientmodel.Timestamp) metric.Values {
 	it.mtx.Lock()
 	defer it.mtx.Unlock()
@@ -406,8 +407,52 @@ func (it *memorySeriesIterator) GetValueAtTime(t clientmodel.Timestamp) metric.V
 }
 
 func (it *memorySeriesIterator) GetBoundaryValues(in metric.Interval) metric.Values {
-	// TODO: implement real GetBoundaryValues here.
-	return it.GetRangeValues(in)
+	it.mtx.Lock()
+	defer it.mtx.Unlock()
+
+	// Find the first relevant chunk.
+	i := sort.Search(len(it.chunks), func(i int) bool {
+		return !it.chunks[i].lastTime().Before(in.OldestInclusive)
+	})
+	values := metric.Values{}
+	for ; i < len(it.chunks); i++ {
+		c := it.chunks[i]
+		var chunkIt chunkIterator
+		if c.firstTime().After(in.NewestInclusive) {
+			if len(values) == 1 {
+				// We found the first value already, but are now
+				// already past the last value. The value we
+				// want must be the last value of the previous
+				// chunk. So backtrack...
+				chunkIt = it.chunks[i-1].newIterator()
+				values = append(values, chunkIt.getValueAtTime(in.NewestInclusive)[0])
+			}
+			break
+		}
+		if len(values) == 0 {
+			chunkIt = c.newIterator()
+			firstValues := chunkIt.getValueAtTime(in.OldestInclusive)
+			switch len(firstValues) {
+			case 2:
+				values = append(values, firstValues[1])
+			case 1:
+				values = firstValues
+			default:
+				panic("unexpected return from getValueAtTime")
+			}
+		}
+		if c.lastTime().After(in.NewestInclusive) {
+			if chunkIt == nil {
+				chunkIt = c.newIterator()
+			}
+			values = append(values, chunkIt.getValueAtTime(in.NewestInclusive)[0])
+			break
+		}
+	}
+	if len(values) == 2 && values[0].Equal(&values[1]) {
+		return values[:1]
+	}
+	return values
 }
 
 func (it *memorySeriesIterator) GetRangeValues(in metric.Interval) metric.Values {
