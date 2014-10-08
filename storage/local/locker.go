@@ -44,7 +44,6 @@ func newFingerprintLocker(preallocatedMutexes int) *fingerprintLocker {
 // getLock either returns an existing fingerprintLock from a pool, or allocates
 // a new one if the pool is depleted.
 func (l *fingerprintLocker) getLock() *fingerprintLock {
-	return l.fpLockPool[0]
 	if len(l.fpLockPool) == 0 {
 		return &fingerprintLock{}
 	}
