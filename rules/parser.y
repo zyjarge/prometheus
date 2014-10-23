@@ -154,6 +154,8 @@ label_match_type   : '='
 
 rule_expr          : '(' rule_expr ')'
                      { $$ = $2 }
+                   | '{' label_match_list '}'
+                     { $$ = ast.NewVectorSelector($2) }
                    | metric_name label_matches
                      {
                        var err error
@@ -184,6 +186,12 @@ rule_expr          : '(' rule_expr ')'
                      {
                        var err error
                        $$, err = NewVectorAggregation($1, $3, $5, $6)
+                       if err != nil { yylex.Error(err.Error()); return 1 }
+                     }
+                   | AGGR_OP grouping_opts extra_labels_opts '(' rule_expr ')'
+                     {
+                       var err error
+                       $$, err = NewVectorAggregation($1, $5, $2, $3)
                        if err != nil { yylex.Error(err.Error()); return 1 }
                      }
                    /* Yacc can only attach associativity to terminals, so we

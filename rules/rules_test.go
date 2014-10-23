@@ -536,6 +536,66 @@ func TestExpressions(t *testing.T) {
 			fullRanges:     0,
 			intervalRanges: 2,
 		},
+		{
+			expr: `{` + string(clientmodel.MetricNameLabel) + `=~".*"}`,
+			output: []string{
+				`http_requests{group="canary", instance="0", job="api-server"} => 300 @[%v]`,
+				`http_requests{group="canary", instance="0", job="app-server"} => 700 @[%v]`,
+				`http_requests{group="canary", instance="1", job="api-server"} => 400 @[%v]`,
+				`http_requests{group="canary", instance="1", job="app-server"} => 800 @[%v]`,
+				`http_requests{group="production", instance="0", job="api-server"} => 100 @[%v]`,
+				`http_requests{group="production", instance="0", job="app-server"} => 500 @[%v]`,
+				`http_requests{group="production", instance="1", job="api-server"} => 200 @[%v]`,
+				`http_requests{group="production", instance="1", job="app-server"} => 600 @[%v]`,
+				`testcounter_reset_end => 0 @[%v]`,
+				`testcounter_reset_middle => 50 @[%v]`,
+				`x{y="testvalue"} => 100 @[%v]`,
+			},
+			fullRanges:     0,
+			intervalRanges: 11,
+		},
+		{
+			expr: `{job=~"server", job!~"api"}`,
+			output: []string{
+				`http_requests{group="canary", instance="0", job="app-server"} => 700 @[%v]`,
+				`http_requests{group="canary", instance="1", job="app-server"} => 800 @[%v]`,
+				`http_requests{group="production", instance="0", job="app-server"} => 500 @[%v]`,
+				`http_requests{group="production", instance="1", job="app-server"} => 600 @[%v]`,
+			},
+			fullRanges:     0,
+			intervalRanges: 4,
+		},
+		{
+			// Test alternative "by"-clause order.
+			expr: `sum by (group) (http_requests{job="api-server"})`,
+			output: []string{
+				`http_requests{group="canary"} => 700 @[%v]`,
+				`http_requests{group="production"} => 300 @[%v]`,
+			},
+			fullRanges:     0,
+			intervalRanges: 4,
+		},
+		{
+			// Test alternative "by"-clause order with "keeping_extra".
+			expr: `sum by (group) keeping_extra (http_requests{job="api-server"})`,
+			output: []string{
+				`http_requests{group="canary", job="api-server"} => 700 @[%v]`,
+				`http_requests{group="production", job="api-server"} => 300 @[%v]`,
+			},
+			fullRanges:     0,
+			intervalRanges: 4,
+		},
+		{
+			// Test both alternative "by"-clause orders in one expression.
+			// Public health warning: stick to one form within an expression (or even
+			// in an organization), or risk serious user confusion.
+			expr: `sum(sum by (group) keeping_extra (http_requests{job="api-server"})) by (job)`,
+			output: []string{
+				`http_requests{job="api-server"} => 1000 @[%v]`,
+			},
+			fullRanges:     0,
+			intervalRanges: 4,
+		},
 	}
 
 	storage, closer := newTestStorage(t)
