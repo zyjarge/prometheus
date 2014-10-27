@@ -169,7 +169,16 @@ func (s *memorySeries) add(fp clientmodel.Fingerprint, v *metric.SamplePair, per
 		newHead := newChunkDesc(newDeltaEncodedChunk(d1, d0, true))
 		s.chunkDescs = append(s.chunkDescs, newHead)
 		s.headChunkPersisted = false
-	} else if s.headChunkUsedByIterator {
+	} else if s.headChunkUsedByIterator && s.head().getRefCount() > 1 {
+		// We only need to clone the head chunk if the current head
+		// chunk was used in an iterator at all and if the refCount is
+		// still greater than the 1 we always have because the head
+		// chunk is not yet persisted. The latter is just an
+		// approximation. We will still clone unnecessarily if an older
+		// iterator using a previous version of the head chunk is still
+		// around and keep the head chunk pinned. We needed to track
+		// pins by version of the head chunk, which is probably not
+		// worth the effort.
 		chunkOps.WithLabelValues(clone).Inc()
 		// No locking needed here because a non-persisted head chunk can
 		// not get evicted concurrently.
