@@ -25,6 +25,12 @@ import (
 	"github.com/prometheus/prometheus/utility/test"
 )
 
+var (
+	m1 = clientmodel.Metric{"label": "value1"}
+	m2 = clientmodel.Metric{"label": "value2"}
+	m3 = clientmodel.Metric{"label": "value3"}
+)
+
 func newTestPersistence(t *testing.T) (*persistence, test.Closer) {
 	dir := test.NewTemporaryDirectory("test_persistence", t)
 	p, err := newPersistence(dir.Path(), 1024)
@@ -40,15 +46,9 @@ func newTestPersistence(t *testing.T) (*persistence, test.Closer) {
 
 func buildTestChunks() map[clientmodel.Fingerprint][]chunk {
 	fps := clientmodel.Fingerprints{
-		clientmodel.Metric{
-			"label": "value1",
-		}.Fingerprint(),
-		clientmodel.Metric{
-			"label": "value2",
-		}.Fingerprint(),
-		clientmodel.Metric{
-			"label": "value3",
-		}.Fingerprint(),
+		m1.Fingerprint(),
+		m2.Fingerprint(),
+		m3.Fingerprint(),
 	}
 	fpToChunks := map[clientmodel.Fingerprint][]chunk{}
 
@@ -75,7 +75,7 @@ func chunksEqual(c1, c2 chunk) bool {
 	return true
 }
 
-func TestPersistChunk(t *testing.T) {
+func TestPersistAndLoadChunks(t *testing.T) {
 	p, closer := newTestPersistence(t)
 	defer closer.Close()
 
@@ -104,9 +104,98 @@ func TestPersistChunk(t *testing.T) {
 		}
 		for _, i := range indexes {
 			if !chunksEqual(expectedChunks[i], actualChunks[i]) {
-				t.Fatalf("%d. Chunks not equal.", i)
+				t.Errorf("%d. Chunks not equal.", i)
 			}
 		}
+		// Load all chunk descs.
+		actualChunkDescs, err := p.loadChunkDescs(fp, 10)
+		if len(actualChunkDescs) != 10 {
+			t.Errorf("Got %d chunkDescs, want %d.", len(actualChunkDescs), 10)
+		}
+		for i, cd := range actualChunkDescs {
+			if cd.firstTime() != clientmodel.Timestamp(i) || cd.lastTime() != clientmodel.Timestamp(i) {
+				t.Errorf(
+					"Want ts=%v, got firstTime=%v, lastTime=%v.",
+					i, cd.firstTime(), cd.lastTime(),
+				)
+			}
+
+		}
+		// Load chunk descs partially.
+		actualChunkDescs, err = p.loadChunkDescs(fp, 5)
+		if len(actualChunkDescs) != 5 {
+			t.Errorf("Got %d chunkDescs, want %d.", len(actualChunkDescs), 5)
+		}
+		for i, cd := range actualChunkDescs {
+			if cd.firstTime() != clientmodel.Timestamp(i) || cd.lastTime() != clientmodel.Timestamp(i) {
+				t.Errorf(
+					"Want ts=%v, got firstTime=%v, lastTime=%v.",
+					i, cd.firstTime(), cd.lastTime(),
+				)
+			}
+
+		}
+	}
+}
+
+func TestCheckpointAndLoadSeriesMapAndHeads(t *testing.T) {
+	p, closer := newTestPersistence(t)
+	defer closer.Close()
+
+	fpLocker := newFingerprintLocker(10)
+	sm := newSeriesMap()
+	s1 := newMemorySeries(m1, true)
+	s2 := newMemorySeries(m2, false)
+	s3 := newMemorySeries(m3, false)
+	s1.add(m1.Fingerprint(), &metric.SamplePair{1, 3.14})
+	s3.add(m1.Fingerprint(), &metric.SamplePair{2, 2.7})
+	s3.headChunkPersisted = true
+	sm.put(m1.Fingerprint(), s1)
+	sm.put(m2.Fingerprint(), s2)
+	sm.put(m3.Fingerprint(), s3)
+
+	if err := p.checkpointSeriesMapAndHeads(sm, fpLocker); err != nil {
+		t.Fatal(err)
+	}
+
+	loadedSM, err := p.loadSeriesMapAndHeads()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedSM.length() != 2 {
+		t.Errorf("want 2 series in map, got %d", loadedSM.length())
+	}
+	if loadedS1, ok := loadedSM.get(m1.Fingerprint()); ok {
+		if !reflect.DeepEqual(loadedS1.metric, m1) {
+			t.Errorf("want metric %v, got %v", m1, loadedS1.metric)
+		}
+		if !reflect.DeepEqual(loadedS1.head().chunk, s1.head().chunk) {
+			t.Error("head chunks differ")
+		}
+		if loadedS1.chunkDescsOffset != 0 {
+			t.Errorf("want chunkDescsOffset 0, got %d", loadedS1.chunkDescsOffset)
+		}
+		if loadedS1.headChunkPersisted {
+			t.Error("headChunkPersisted is true")
+		}
+	} else {
+		t.Errorf("couldn't find %v in loaded map", m1)
+	}
+	if loadedS3, ok := loadedSM.get(m3.Fingerprint()); ok {
+		if !reflect.DeepEqual(loadedS3.metric, m3) {
+			t.Errorf("want metric %v, got %v", m3, loadedS3.metric)
+		}
+		if loadedS3.head().chunk != nil {
+			t.Error("head chunk not evicted")
+		}
+		if loadedS3.chunkDescsOffset != -1 {
+			t.Errorf("want chunkDescsOffset -1, got %d", loadedS3.chunkDescsOffset)
+		}
+		if !loadedS3.headChunkPersisted {
+			t.Error("headChunkPersisted is false")
+		}
+	} else {
+		t.Errorf("couldn't find %v in loaded map", m1)
 	}
 }
 

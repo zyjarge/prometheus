@@ -539,7 +539,7 @@ func (it *memorySeriesIterator) GetBoundaryValues(in metric.Interval) metric.Val
 		var chunkIt chunkIterator
 		if c.firstTime().After(in.NewestInclusive) {
 			if len(values) == 1 {
-				// We found the first value already, but are now
+				// We found the first value before, but are now
 				// already past the last value. The value we
 				// want must be the last value of the previous
 				// chunk. So backtrack...

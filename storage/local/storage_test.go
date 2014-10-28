@@ -22,7 +22,41 @@ import (
 
 	clientmodel "github.com/prometheus/client_golang/model"
 	"github.com/prometheus/prometheus/storage/metric"
+	"github.com/prometheus/prometheus/utility/test"
 )
+
+func TestGetFingerprintsForLabelMatchers(t *testing.T) {
+
+}
+
+func TestLoop(t *testing.T) {
+	// Just a smoke test for the loop method.
+	samples := make(clientmodel.Samples, 1000)
+	for i := range samples {
+		samples[i] = &clientmodel.Sample{
+			Timestamp: clientmodel.Timestamp(2 * i),
+			Value:     clientmodel.SampleValue(float64(i) * 0.2),
+		}
+	}
+	directory := test.NewTemporaryDirectory("test_storage", t)
+	defer directory.Close()
+	o := &MemorySeriesStorageOptions{
+		MemoryEvictionInterval:     100 * time.Millisecond,
+		MemoryRetentionPeriod:      time.Hour,
+		PersistencePurgeInterval:   150 * time.Millisecond,
+		PersistenceRetentionPeriod: 24 * 7 * time.Hour,
+		PersistenceStoragePath:     directory.Path(),
+		CheckpointInterval:         250 * time.Millisecond,
+	}
+	storage, err := NewMemorySeriesStorage(o)
+	if err != nil {
+		t.Fatalf("Error creating storage: %s", err)
+	}
+	storage.Start()
+	storage.AppendSamples(samples)
+	time.Sleep(time.Second)
+	storage.Stop()
+}
 
 func TestChunk(t *testing.T) {
 	samples := make(clientmodel.Samples, 500000)
