@@ -28,6 +28,7 @@ import (
 
 	clientmodel "github.com/prometheus/client_golang/model"
 
+	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/utility"
 )
 
@@ -62,6 +63,23 @@ var (
 
 func init() {
 	prometheus.MustRegister(targetIntervalLength)
+}
+
+// authCredentials describes the username and password to use for HTTP Basic
+// Authentication when scraping targets.
+type authCredentials struct {
+	username string
+	password string
+}
+
+func NewAuthCredentials(job *config.JobConfig) *authCredentials {
+	if job.GetUsername() == "" && job.GetPassword() == "" {
+		return nil
+	}
+	return &authCredentials{
+		username: job.GetUsername(),
+		password: job.GetPassword(),
+	}
 }
 
 // TargetState describes the state of a Target.
@@ -153,6 +171,9 @@ type target struct {
 	baseLabels clientmodel.LabelSet
 	// The HTTP client used to scrape the target's endpoint.
 	httpClient *http.Client
+	// Basic authentication credentials for scraping the targets of this job.
+	// Optional and not used if nil.
+	credentials *authCredentials
 
 	// Mutex protects lastError, lastScrape, state, and baseLabels.  Writing
 	// the above must only happen in the goroutine running the RunScraper
@@ -163,7 +184,7 @@ type target struct {
 }
 
 // NewTarget creates a reasonably configured target for querying.
-func NewTarget(url string, deadline time.Duration, baseLabels clientmodel.LabelSet) Target {
+func NewTarget(url string, deadline time.Duration, baseLabels clientmodel.LabelSet, credentials *authCredentials) Target {
 	target := &target{
 		url:             url,
 		Deadline:        deadline,
@@ -172,6 +193,7 @@ func NewTarget(url string, deadline time.Duration, baseLabels clientmodel.LabelS
 		scraperStopping: make(chan struct{}),
 		scraperStopped:  make(chan struct{}),
 		newBaseLabels:   make(chan clientmodel.LabelSet, 1),
+		credentials:     credentials,
 	}
 
 	return target
@@ -302,6 +324,9 @@ func (t *target) scrape(ingester extraction.Ingester) (err error) {
 		panic(err)
 	}
 	req.Header.Add("Accept", acceptHeader)
+	if t.credentials != nil {
+		req.SetBasicAuth(t.credentials.username, t.credentials.password)
+	}
 
 	resp, err := t.httpClient.Do(req)
 	if err != nil {

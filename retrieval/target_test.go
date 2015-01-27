@@ -104,7 +104,7 @@ func TestTargetScrapeTimeout(t *testing.T) {
 
 	defer server.Close()
 
-	testTarget := NewTarget(server.URL, 10*time.Millisecond, clientmodel.LabelSet{})
+	testTarget := NewTarget(server.URL, 10*time.Millisecond, clientmodel.LabelSet{}, nil)
 	ingester := nopIngester{}
 
 	// scrape once without timeout
@@ -143,7 +143,7 @@ func TestTargetScrape404(t *testing.T) {
 
 	defer server.Close()
 
-	testTarget := NewTarget(server.URL, 10*time.Millisecond, clientmodel.LabelSet{})
+	testTarget := NewTarget(server.URL, 10*time.Millisecond, clientmodel.LabelSet{}, nil)
 	ingester := nopIngester{}
 
 	want := errors.New("server returned HTTP status 404 Not Found")

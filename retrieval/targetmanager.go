@@ -108,8 +108,9 @@ func (m *targetManager) AddTargetsFromConfig(config config.Config) {
 				}
 			}
 
+			credentials := NewAuthCredentials(&job)
 			for _, endpoint := range targetGroup.Target {
-				target := NewTarget(endpoint, job.ScrapeTimeout(), baseLabels)
+				target := NewTarget(endpoint, job.ScrapeTimeout(), baseLabels, credentials)
 				m.AddTarget(job, target)
 			}
 		}

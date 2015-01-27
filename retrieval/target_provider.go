@@ -65,6 +65,10 @@ type sdTargetProvider struct {
 
 	lastRefresh     time.Time
 	refreshInterval time.Duration
+
+	// Basic authentication credentials for scraping the targets of this job.
+	// Optional and not used if nil.
+	credentials *authCredentials
 }
 
 // NewSdTargetProvider constructs a new sdTargetProvider for a job.
@@ -76,6 +80,7 @@ func NewSdTargetProvider(job config.JobConfig) *sdTargetProvider {
 	return &sdTargetProvider{
 		job:             job,
 		refreshInterval: i,
+		credentials:     NewAuthCredentials(&job),
 	}
 }
 
@@ -104,7 +109,7 @@ func (p *sdTargetProvider) Targets() ([]Target, error) {
 
 	targets := make([]Target, 0, len(response.Answer))
 	endpoint := &url.URL{
-		Scheme: "http",
+		Scheme: p.job.GetUriScheme(),
 		Path:   p.job.GetMetricsPath(),
 	}
 	for _, record := range response.Answer {
@@ -118,7 +123,7 @@ func (p *sdTargetProvider) Targets() ([]Target, error) {
 			addr.Target = addr.Target[:len(addr.Target)-1]
 		}
 		endpoint.Host = fmt.Sprintf("%s:%d", addr.Target, addr.Port)
-		t := NewTarget(endpoint.String(), p.job.ScrapeTimeout(), baseLabels)
+		t := NewTarget(endpoint.String(), p.job.ScrapeTimeout(), baseLabels, p.credentials)
 		targets = append(targets, t)
 	}
 

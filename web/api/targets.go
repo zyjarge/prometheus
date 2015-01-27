@@ -48,7 +48,7 @@ func (serv MetricsService) SetTargets(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "job not found", http.StatusNotFound)
 		return
 	}
-
+	credentials := retrieval.NewAuthCredentials(job)
 	newTargets := []retrieval.Target{}
 
 	for _, targetGroup := range targetGroups {
@@ -61,7 +61,7 @@ func (serv MetricsService) SetTargets(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, endpoint := range targetGroup.Endpoints {
-			newTarget := retrieval.NewTarget(endpoint, job.ScrapeTimeout(), baseLabels)
+			newTarget := retrieval.NewTarget(endpoint, job.ScrapeTimeout(), baseLabels, credentials)
 			newTargets = append(newTargets, newTarget)
 		}
 	}

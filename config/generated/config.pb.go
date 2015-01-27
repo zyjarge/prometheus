@@ -169,8 +169,14 @@ type JobConfig struct {
 	// List of labeled target groups for this job. Only legal when DNS-SD isn't
 	// used for a job.
 	TargetGroup []*TargetGroup `protobuf:"bytes,5,rep,name=target_group" json:"target_group,omitempty"`
-	// The HTTP resource path to fetch metrics from on targets.
-	MetricsPath      *string `protobuf:"bytes,6,opt,name=metrics_path,def=/metrics" json:"metrics_path,omitempty"`
+	// The URI scheme to use when fetching metrics from service-discovered targets.
+	UriScheme *string `protobuf:"bytes,8,opt,name=uri_scheme,def=http" json:"uri_scheme,omitempty"`
+	// The HTTP resource path to fetch metrics from for service-discovered targets.
+	MetricsPath *string `protobuf:"bytes,6,opt,name=metrics_path,def=/metrics" json:"metrics_path,omitempty"`
+	// Username to use for HTTP basic authentication.
+	Username *string `protobuf:"bytes,9,opt,name=username" json:"username,omitempty"`
+	// Password to use for HTTP basic authentication.
+	Password         *string `protobuf:"bytes,10,opt,name=password" json:"password,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -180,6 +186,7 @@ func (*JobConfig) ProtoMessage()    {}
 
 const Default_JobConfig_ScrapeTimeout string = "10s"
 const Default_JobConfig_SdRefreshInterval string = "30s"
+const Default_JobConfig_UriScheme string = "http"
 const Default_JobConfig_MetricsPath string = "/metrics"
 
 func (m *JobConfig) GetName() string {
@@ -224,11 +231,32 @@ func (m *JobConfig) GetTargetGroup() []*TargetGroup {
 	return nil
 }
 
+func (m *JobConfig) GetUriScheme() string {
+	if m != nil && m.UriScheme != nil {
+		return *m.UriScheme
+	}
+	return Default_JobConfig_UriScheme
+}
+
 func (m *JobConfig) GetMetricsPath() string {
 	if m != nil && m.MetricsPath != nil {
 		return *m.MetricsPath
 	}
 	return Default_JobConfig_MetricsPath
+}
+
+func (m *JobConfig) GetUsername() string {
+	if m != nil && m.Username != nil {
+		return *m.Username
+	}
+	return ""
+}
+
+func (m *JobConfig) GetPassword() string {
+	if m != nil && m.Password != nil {
+		return *m.Password
+	}
+	return ""
 }
 
 // The top-level Prometheus configuration.
