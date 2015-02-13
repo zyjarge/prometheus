@@ -27,7 +27,7 @@ advice:
 binary: build
 
 build: config dependencies tools web
-	$(GO) build -o prometheus $(BUILDFLAGS) .
+	$(GODEP) go build -o prometheus $(BUILDFLAGS) .
 
 docker: build
 	docker build -t prometheus:$(REV) .
@@ -67,7 +67,6 @@ config: dependencies
 
 dependencies: $(GOCC) $(FULL_GOPATH)
 	$(GO) get github.com/tools/godep
-	$(GODEP) restore
 	$(GO) get -d
 
 documentation: search_index
@@ -77,7 +76,7 @@ format:
 	find . -iname '*.go' | egrep -v "^\./\.build|./generated|\./Godeps|\.(l|y)\.go" | xargs -n1 $(GOFMT) -w -s=true
 
 race_condition_binary: build
-	$(GO) build -race -o prometheus.race $(BUILDFLAGS) .
+	$(GODEP) go build -race -o prometheus.race $(BUILDFLAGS) .
 
 race_condition_run: race_condition_binary
 	./prometheus.race $(ARGUMENTS)
